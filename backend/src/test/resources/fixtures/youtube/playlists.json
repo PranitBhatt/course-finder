@@ -1,0 +1,20 @@
+{
+  "kind": "youtube#playlistListResponse",
+  "items": [
+    {
+      "kind": "youtube#playlist",
+      "id": "PL_ML_1",
+      "snippet": {
+        "title": "Machine Learning Full Course",
+        "description": "The complete, untruncated playlist description about machine learning.",
+        "channelTitle": "freeCodeCamp.org",
+        "defaultLanguage": "en",
+        "thumbnails": {
+          "high": { "url": "https://i.ytimg.com/ml/high.jpg", "width": 480, "height": 360 },
+          "maxres": { "url": "https://i.ytimg.com/ml/maxres.jpg", "width": 1280, "height": 720 }
+        }
+      },
+      "contentDetails": { "itemCount": 42 }
+    }
+  ]
+}

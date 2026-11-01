@@ -1,0 +1,37 @@
+{
+  "elements": [
+    {
+      "courseType": "v2.ondemand",
+      "id": "Gtv4Xb1-EeS-ViIACwYKVQ",
+      "slug": "machine-learning",
+      "name": "Machine Learning",
+      "description": "Learn the fundamentals of machine learning from Andrew Ng.",
+      "photoUrl": "https://images.example.com/ml.png",
+      "workload": "60 hours",
+      "primaryLanguages": ["en"],
+      "partnerIds": ["1", "2"]
+    },
+    {
+      "courseType": "v2.ondemand",
+      "id": "abc123",
+      "slug": "python-for-everybody",
+      "name": "  Python for Everybody  ",
+      "description": "",
+      "photoUrl": "",
+      "workload": "",
+      "primaryLanguages": [],
+      "partnerIds": ["3"]
+    }
+  ],
+  "paging": {
+    "next": "2",
+    "total": 4
+  },
+  "linked": {
+    "partners.v1": [
+      { "id": "1", "name": "Stanford University", "shortName": "stanford" },
+      { "id": "2", "name": "DeepLearning.AI", "shortName": "deeplearningai" },
+      { "id": "3", "name": "University of Michigan", "shortName": "umich" }
+    ]
+  }
+}

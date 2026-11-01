@@ -1,0 +1,23 @@
+# Secrets
+.env
+
+# Java / Maven
+backend/target/
+*.class
+*.log
+
+# IntelliJ
+.idea/
+*.iml
+out/
+
+# VS Code
+.vscode/
+
+# Node / Vite
+frontend/node_modules/
+frontend/dist/
+
+# OS
+.DS_Store
+Thumbs.db

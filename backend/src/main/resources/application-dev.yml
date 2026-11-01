@@ -1,0 +1,7 @@
+app:
+  admin:
+    enabled: true
+
+logging:
+  level:
+    com.coursefinder: DEBUG

@@ -1,0 +1,70 @@
+spring:
+  application:
+    name: course-finder
+
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:coursefinder}
+    username: ${POSTGRES_USER:coursefinder}
+    password: ${POSTGRES_PASSWORD:coursefinder}
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Schema is owned by Flyway; Hibernate only checks that entities match it.
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: 8080
+
+app:
+  cors:
+    allowed-origins:
+      - http://localhost:5173
+
+  search:
+    # Typo tolerance: min trigram word similarity (0-1). Lower = more forgiving, more noise.
+    fuzzy-threshold: 0.4
+
+  admin:
+    # Enables POST /api/admin/sync/{source}. No auth - keep off outside dev.
+    enabled: false
+
+  coursera:
+    enabled: true
+    base-url: https://api.coursera.org
+    page-size: 100
+    # Safety cap so a misbehaving endpoint can't loop forever.
+    max-pages: 2000
+    # Per-page retries on network errors / 5xx (4xx are not retried).
+    max-retries: 2
+    retry-backoff: 1s
+    sync-cron: "0 0 3 * * *"
+    sync-on-startup-if-empty: true
+    connect-timeout: 5s
+    read-timeout: 30s
+
+  youtube:
+    api-key: ${YOUTUBE_API_KEY:}
+    base-url: https://www.googleapis.com/youtube/v3
+    max-results: 25
+    cache-ttl: 7d
+    # Free tier is 10,000 units/day; search.list = 100 units, playlists.list = 1 unit.
+    daily-quota-units: 9000
+    connect-timeout: 3s
+    read-timeout: 5s
+
+logging:
+  level:
+    com.coursefinder: INFO

@@ -1,0 +1,29 @@
+{
+  "elements": [
+    {
+      "courseType": "v2.ondemand",
+      "id": "xyz789",
+      "slug": "deep-learning",
+      "name": "Deep Learning Specialization",
+      "description": "Neural networks, CNNs, RNNs and transformers.",
+      "photoUrl": "https://images.example.com/dl.png",
+      "workload": "4 months",
+      "primaryLanguages": ["en", "es"],
+      "partnerIds": ["2"],
+      "someNewFieldCourseraAdded": { "nested": true }
+    },
+    {
+      "courseType": "v2.ondemand",
+      "id": "broken-no-slug",
+      "name": "Element without slug is skipped"
+    }
+  ],
+  "paging": {
+    "total": 4
+  },
+  "linked": {
+    "partners.v1": [
+      { "id": "2", "name": "DeepLearning.AI", "shortName": "deeplearningai" }
+    ]
+  }
+}

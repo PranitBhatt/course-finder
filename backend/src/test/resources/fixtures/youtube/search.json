@@ -1,0 +1,31 @@
+{
+  "kind": "youtube#searchListResponse",
+  "pageInfo": { "totalResults": 2, "resultsPerPage": 25 },
+  "items": [
+    {
+      "kind": "youtube#searchResult",
+      "id": { "kind": "youtube#playlist", "playlistId": "PL_ML_1" },
+      "snippet": {
+        "title": "Machine Learning Full Course",
+        "description": "Truncated description...",
+        "channelTitle": "freeCodeCamp.org",
+        "thumbnails": {
+          "default": { "url": "https://i.ytimg.com/ml/default.jpg", "width": 120, "height": 90 },
+          "high": { "url": "https://i.ytimg.com/ml/high.jpg", "width": 480, "height": 360 }
+        }
+      }
+    },
+    {
+      "kind": "youtube#searchResult",
+      "id": { "kind": "youtube#playlist", "playlistId": "PL_PY_2" },
+      "snippet": {
+        "title": "Python &amp; Data Science &#39;Full&#39; Course",
+        "description": "Pandas &amp; NumPy",
+        "channelTitle": "Corey Schafer",
+        "thumbnails": {
+          "medium": { "url": "https://i.ytimg.com/py/medium.jpg", "width": 320, "height": 180 }
+        }
+      }
+    }
+  ]
+}
