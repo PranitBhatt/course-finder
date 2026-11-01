@@ -1,0 +1,98 @@
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+}
+
+/* ---------- platform: segmented control ---------- */
+
+.segmented {
+  display: inline-flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--card-shadow);
+}
+
+.segment {
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--mute);
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.segment:hover {
+  color: var(--ink);
+}
+
+.segment[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* ---------- free only: switch ---------- */
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  border: 0;
+  background: transparent;
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.track {
+  position: relative;
+  width: 44px;
+  height: 26px;
+  border-radius: var(--radius-pill);
+  background: var(--line);
+  transition: background-color 0.2s ease;
+}
+
+.thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.25s var(--ease-out-expo);
+}
+
+.switch[aria-checked='true'] .track {
+  background: var(--green);
+}
+
+.switch[aria-checked='true'] .thumb {
+  transform: translateX(18px);
+}
+
+@media (max-width: 640px) {
+  .segmented {
+    flex: 1;
+  }
+
+  .segment {
+    flex: 1;
+    padding: 0 var(--space-2);
+  }
+}

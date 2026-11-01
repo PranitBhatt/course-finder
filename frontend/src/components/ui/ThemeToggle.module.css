@@ -1,0 +1,22 @@
+.toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: var(--card-shadow);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.toggle:hover {
+  border-color: var(--mute);
+}
+
+.toggle:active {
+  transform: scale(0.94);
+}

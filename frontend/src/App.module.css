@@ -1,0 +1,12 @@
+.shell {
+  width: 100%;
+  max-width: calc(var(--page-max) + 2 * var(--gutter));
+  margin: 0 auto;
+  padding-inline: max(var(--gutter), env(safe-area-inset-left, 0px));
+}
+
+@media (min-width: 900px) {
+  .shell {
+    --gutter: 32px;
+  }
+}

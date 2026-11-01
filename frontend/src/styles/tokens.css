@@ -1,0 +1,100 @@
+/*
+ * Design tokens, taken from the "Clean Tech" reel (v4_cleantech/index.html).
+ * Light = the reel's palette. Dark = the reel's player chrome, with the same blue accent.
+ * Theme is chosen by <html data-theme="dark|light">; dark is the default.
+ */
+
+:root {
+  /* type */
+  --font-head: 'Inter Tight', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-body: 'Inter Tight', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
+
+  /* shape */
+  --radius-card: 26px;
+  --radius-control: 16px;
+  --radius-pill: 999px;
+  --radius-thumb: 18px;
+
+  /* spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  --page-max: 1180px;
+  --gutter: 16px;
+
+  /* brand colors (shared by both themes) */
+  --blue: #2f5bff;
+  --green: #18b46b;
+  --on-accent: #ffffff;
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ---------- dark (default) ---------- */
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #0b0b0d;
+  --surface: #141417;
+  --surface-2: #1b1b20;
+  --ink: #f2f0ea;
+  --mute: #8d8c93;
+  --faint: #5d5c63;
+  --line: #26262c;
+
+  /* blue text needs to be a touch lighter to stay readable on near-black */
+  --accent: #2f5bff;
+  --accent-ink: #6f8cff;
+  --accent-soft: rgba(47, 91, 255, 0.16);
+  --success-ink: #3ddc97;
+  --success-soft: rgba(24, 180, 107, 0.16);
+  --danger-ink: #ff7a7a;
+
+  --skeleton: #1d1d22;
+  --skeleton-shine: #26262c;
+
+  --card-shadow: 0 16px 44px rgba(0, 0, 0, 0.45);
+  --card-border: rgba(255, 255, 255, 0.06);
+
+  --dot: rgba(255, 255, 255, 0.07);
+  --glow-blue: rgba(47, 91, 255, 0.16);
+  --glow-green: rgba(24, 180, 107, 0.06);
+}
+
+/* ---------- light ---------- */
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --surface-2: #f7f8fa;
+  --ink: #0d0f14;
+  --mute: #6b7280;
+  --faint: #9aa1ad;
+  --line: #e3e6ec;
+
+  --accent: #2f5bff;
+  --accent-ink: #2f5bff;
+  --accent-soft: #e8edff;
+  --success-ink: #128a52;
+  --success-soft: rgba(24, 180, 107, 0.12);
+  --danger-ink: #d92d2d;
+
+  --skeleton: #eef0f4;
+  --skeleton-shine: #f6f7fa;
+
+  --card-shadow: 0 16px 44px rgba(13, 15, 40, 0.13);
+  --card-border: rgba(13, 15, 20, 0.08);
+
+  --dot: rgba(13, 15, 20, 0.085);
+  --glow-blue: rgba(47, 91, 255, 0.1);
+  --glow-green: rgba(24, 180, 107, 0.05);
+}

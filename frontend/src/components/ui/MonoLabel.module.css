@@ -1,0 +1,21 @@
+.label {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.4;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.mute {
+  color: var(--mute);
+}
+
+.accent {
+  color: var(--accent-ink);
+}
+
+.faint {
+  color: var(--faint);
+}

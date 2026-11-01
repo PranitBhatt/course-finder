@@ -6,7 +6,7 @@ ranked results from Coursera and YouTube.
 ```
 Course Finder/
 ├── backend/             Spring Boot 3 API (Java 21)
-├── frontend/            React + Vite (coming later)
+├── frontend/            React 19 + TypeScript + Vite
 ├── docker-compose.yml   PostgreSQL 16
 └── .env.example         Environment variables template
 ```
@@ -99,7 +99,36 @@ $env:YOUTUBE_API_KEY="your-key"; .\mvnw.cmd spring-boot:run "-Dspring-boot.run.p
 
 The API runs on <http://localhost:8080>.
 
-### 4. Run the tests
+### 4. Run the frontend
+
+Needs Node 20.19+ (or 22.12+). From the `frontend` folder:
+
+```bash
+npm install
+npm run dev
+```
+
+Open <http://localhost:5173>. Vite forwards `/api/*` to the backend on port 8080, so start the
+backend first (without it the page shows a "Can't reach the server" state).
+
+- `npm run build` - typecheck + production build into `frontend/dist`
+- Dark mode is the default; the toggle top-right switches it and is remembered per browser
+- The search lives in the URL (`/?q=python&source=youtube&free=1&page=2`), so any results page can be shared
+
+Frontend layout (`frontend/src`):
+
+| Folder        | Contents                                                        |
+|---------------|-----------------------------------------------------------------|
+| `api`         | Typed fetch client and the backend's response types             |
+| `hooks`       | Search state in the URL, debounce, data fetching, theme         |
+| `pages`       | `SearchPage`, `NotFoundPage`                                    |
+| `components`  | `course/` cards + skeletons, `search/` bar + filters, `pagination/`, `feedback/` empty/error states, `layout/`, `ui/` |
+| `styles`      | `tokens.css` (colors, fonts, spacing for both themes), `global.css` |
+
+The visual style (colors, Inter Tight + JetBrains Mono, soft white cards, the blue "pill"
+headline, dot-grid background) is taken from the Clean Tech reel design.
+
+### 5. Run the tests
 
 ```bash
 ./mvnw test

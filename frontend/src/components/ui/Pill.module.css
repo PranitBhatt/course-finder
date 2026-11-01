@@ -1,0 +1,19 @@
+.pill {
+  display: inline-block;
+  padding: 0.02em 0.16em 0.06em;
+  border-radius: 0.24em;
+  background: var(--accent);
+  color: var(--on-accent);
+  /* grows in from the left, like the reel's pillBehind() */
+  animation: grow 0.7s var(--ease-out-expo) 0.15s both;
+  transform-origin: left center;
+}
+
+@keyframes grow {
+  from {
+    clip-path: inset(0 100% 0 0 round 0.24em);
+  }
+  to {
+    clip-path: inset(0 0 0 0 round 0.24em);
+  }
+}
