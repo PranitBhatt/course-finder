@@ -3,9 +3,36 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Search courses from Coursera and YouTube in one place." />
-    <title>Course Finder</title>
+
+    <!-- __SITE_URL__ is replaced at build time with VITE_SITE_URL (see vite.config.ts). -->
+    <title>Course Finder | Search Coursera and YouTube courses</title>
+    <meta
+      name="description"
+      content="Search free and paid courses from Coursera and YouTube in one ranked list. Find your next course on machine learning, Python, data science and more."
+    />
+    <link rel="canonical" href="__SITE_URL__/" />
+    <meta name="theme-color" content="#0b0b0d" />
+
+    <!-- Favicon: replace public/favicon.svg with your own logo if you like (keep the file name). -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!-- Open Graph / social previews -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Course Finder" />
+    <meta property="og:title" content="Course Finder | Search Coursera and YouTube courses" />
+    <meta
+      property="og:description"
+      content="Free and paid courses from Coursera and YouTube in one ranked list."
+    />
+    <meta property="og:url" content="__SITE_URL__/" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Course Finder" />
+    <meta name="twitter:description" content="Free and paid courses from Coursera and YouTube in one ranked list." />
+    <!--
+      Optional preview image (1200x630 PNG). Add public/og-image.png, then uncomment:
+      <meta property="og:image" content="__SITE_URL__/og-image.png" />
+      <meta name="twitter:card" content="summary_large_image" />
+    -->
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -25,5 +52,13 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+
+    <!--
+      ===================== CLOUDFLARE WEB ANALYTICS =====================
+      Set VITE_CF_ANALYTICS_TOKEN (Vercel -> Settings -> Environment Variables)
+      and redeploy: the Cloudflare beacon script is inserted on the next line.
+      Without the token nothing is added. See DEPLOY.md, step G.
+    -->
+    <!-- CLOUDFLARE_WEB_ANALYTICS -->
   </body>
 </html>

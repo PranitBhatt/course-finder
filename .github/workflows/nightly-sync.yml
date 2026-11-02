@@ -1,0 +1,70 @@
+# Nightly Coursera catalog sync.
+#
+# The backend runs on Render's free plan, which sleeps when idle and restarts often, so an
+# in-app cron job is unreliable. This workflow wakes the backend, starts the sync through the
+# admin API, and waits for it to finish (the polling also keeps the instance awake meanwhile).
+#
+# Repo secrets (Settings -> Secrets and variables -> Actions):
+#   BACKEND_URL  e.g. https://course-finder-api.onrender.com   (no trailing slash needed)
+#   ADMIN_TOKEN  same value as ADMIN_TOKEN on Render
+
+name: Nightly Coursera sync
+
+on:
+  schedule:
+    - cron: "30 20 * * *"   # 20:30 UTC = 02:00 IST
+  workflow_dispatch:         # "Run workflow" button in the Actions tab
+
+concurrency:
+  group: nightly-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      BACKEND_URL: ${{ secrets.BACKEND_URL }}
+      ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+
+    steps:
+      - name: Check secrets
+        run: |
+          if [ -z "$BACKEND_URL" ] || [ -z "$ADMIN_TOKEN" ]; then
+            echo "::error::Set the BACKEND_URL and ADMIN_TOKEN repository secrets first."
+            exit 1
+          fi
+
+      - name: Start the sync
+        run: |
+          url="${BACKEND_URL%/}/api/admin/sync/COURSERA"
+          # A sleeping free instance can take a minute or two to start, so retry patiently.
+          status=$(curl -sS -o response.json -w '%{http_code}' \
+            --retry 8 --retry-delay 20 --retry-connrefused --max-time 120 \
+            -X POST -H "X-Admin-Token: $ADMIN_TOKEN" "$url")
+          echo "HTTP $status"
+          cat response.json; echo
+
+          if [ "$status" = "409" ]; then
+            echo "::notice::A sync is already running; waiting for it instead."
+          elif [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "::error::Sync request failed with HTTP $status"
+            exit 1
+          fi
+
+      - name: Wait for the sync to finish
+        run: |
+          url="${BACKEND_URL%/}/api/sources"
+          sleep 20
+          for i in $(seq 1 45); do
+            state=$(curl -sS --retry 3 --retry-delay 10 --max-time 60 "$url" \
+              | jq -r '.[] | select(.source == "COURSERA") | "\(.lastSyncStatus) \(.courseCount)"')
+            echo "$(date -u +%H:%M:%S) status/courses: $state"
+            case "$state" in
+              SUCCESS*) echo "Sync finished."; exit 0 ;;
+              FAILED*)  echo "::error::Sync failed. Check the Render logs."; exit 1 ;;
+            esac
+            sleep 60
+          done
+          echo "::error::Sync still running after 45 minutes."
+          exit 1

@@ -3,6 +3,7 @@ import type { CourseSource } from '../../api/types';
 import { CourseGrid, CourseGridSkeleton } from '../../components/course/CourseGrid';
 import { EmptyState } from '../../components/feedback/EmptyState';
 import { ErrorState } from '../../components/feedback/ErrorState';
+import { SlowLoadingNotice } from '../../components/feedback/SlowLoadingNotice';
 import { WelcomeState } from '../../components/feedback/WelcomeState';
 import { Pagination } from '../../components/pagination/Pagination';
 import { Filters } from '../../components/search/Filters';
@@ -15,6 +16,7 @@ import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useSearchUrlState } from '../../hooks/useSearchUrlState';
 import { useSources } from '../../hooks/useSources';
 import { formatNumber } from '../../utils/format';
+import { DEFAULT_TITLE, searchTitle } from '../../utils/site';
 import styles from './SearchPage.module.css';
 
 const DEBOUNCE_MS = 350;
@@ -52,7 +54,7 @@ export function SearchPage() {
   }, [params.q]);
 
   useEffect(() => {
-    document.title = params.q ? `${params.q} · Course Finder` : 'Course Finder';
+    document.title = params.q ? searchTitle(params.q) : DEFAULT_TITLE;
   }, [params.q]);
 
   const searchNow = (value: string) => {
@@ -105,6 +107,7 @@ export function SearchPage() {
 
         {state.status === 'loading' && (
           <>
+            <SlowLoadingNotice />
             <div className={styles.countSkeleton} aria-hidden="true" />
             <CourseGridSkeleton count={SKELETON_COUNT} />
           </>

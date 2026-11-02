@@ -1,5 +1,6 @@
 package com.coursefinder.controller;
 
+import com.coursefinder.config.CorsConfig;
 import com.coursefinder.dto.request.CourseSearchRequest;
 import com.coursefinder.dto.response.CourseDto;
 import com.coursefinder.dto.response.CourseSearchResponse;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -32,6 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /** Web layer only: request binding, validation, error format, CORS. Services are mocked. */
 @WebMvcTest(CourseController.class)
+@Import(CorsConfig.class)
 class CourseControllerTest {
 
     @Autowired

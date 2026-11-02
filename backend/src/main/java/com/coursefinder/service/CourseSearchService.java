@@ -28,13 +28,16 @@ public class CourseSearchService {
     private final CourseRepository courseRepository;
     private final TopicFetchService topicFetchService;
     private final CourseMapper courseMapper;
+    private final SearchLogService searchLogService;
 
     public CourseSearchService(CourseRepository courseRepository,
                                TopicFetchService topicFetchService,
-                               CourseMapper courseMapper) {
+                               CourseMapper courseMapper,
+                               SearchLogService searchLogService) {
         this.courseRepository = courseRepository;
         this.topicFetchService = topicFetchService;
         this.courseMapper = courseMapper;
+        this.searchLogService = searchLogService;
     }
 
     public CourseSearchResponse search(CourseSearchRequest request) {
@@ -57,6 +60,11 @@ public class CourseSearchService {
         List<CourseSearchResultDto> content = page.getContent().stream()
                 .map(courseMapper::toSearchResult)
                 .toList();
+
+        // Count each search once, not once per results page the user clicks through.
+        if (request.page() == 0) {
+            searchLogService.logSearchAsync(query, page.getTotalElements());
+        }
 
         return new CourseSearchResponse(
                 query,

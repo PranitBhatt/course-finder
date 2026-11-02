@@ -19,6 +19,7 @@
 
     <properties>
         <java.version>21</java.version>
+        <bucket4j.version>8.21.0</bucket4j.version>
     </properties>
 
     <dependencies>
@@ -49,6 +50,23 @@
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
+        </dependency>
+
+        <!-- Health endpoint for the hosting platform -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- Rate limiting: token buckets per client IP, kept in a size-bounded cache -->
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j_jdk17-core</artifactId>
+            <version>${bucket4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
         </dependency>
 
         <!-- Generates metadata so IntelliJ autocompletes app.* properties -->
@@ -82,6 +100,8 @@
     </dependencies>
 
     <build>
+        <!-- Fixed name so the Dockerfile can copy target/course-finder.jar -->
+        <finalName>course-finder</finalName>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>

@@ -81,7 +81,7 @@ docker compose up -d
 
 1. *File > Open* and select the `backend` folder (or the root, then add `backend/pom.xml` as a Maven project)
 2. Open `CourseFinderApplication` > *Modify Run Configuration*:
-   - *Active profiles*: `dev` (enables the admin sync endpoint + debug logs)
+   - *Active profiles*: `dev` (local admin token `dev-admin-token` + debug logs)
    - *Environment variables*: `YOUTUBE_API_KEY=your-key` (or use the EnvFile plugin with `.env`)
 3. Run it. Flyway creates the schema and the first Coursera sync starts in the background.
 
@@ -205,17 +205,36 @@ One course, same fields as above without `score`. `404` if not found.
 ]
 ```
 
-### `POST /api/admin/sync/{source}` (dev profile only)
+### Admin endpoints (`/api/admin/**`)
 
-Starts a background catalog sync and returns `202 Accepted`. Watch progress via `/api/sources`.
+Every admin request needs the header `X-Admin-Token` matching the `ADMIN_TOKEN` environment
+variable; otherwise `401`. With the `dev` profile the local token is `dev-admin-token`.
 
-- `409` if a sync for that source is already running
-- `400` for `youtube` (on-demand only, nothing to sync)
-- `404` when not running with the `dev` profile (the endpoint has no auth, so it's off by default)
+**`POST /api/admin/sync/{source}`** starts a background catalog sync and returns `202 Accepted`.
+Watch progress via `/api/sources`. `409` if one is already running, `400` for `youtube`
+(on-demand only). Safe to repeat: courses are upserted.
 
 ```bash
-curl -X POST http://localhost:8080/api/admin/sync/coursera
+curl -X POST http://localhost:8080/api/admin/sync/coursera -H "X-Admin-Token: dev-admin-token"
 ```
+
+**`GET /api/admin/stats`** returns search analytics: total searches, searches per day for the last
+30 days, the top 20 queries and the top 20 queries that found nothing.
+
+```bash
+curl http://localhost:8080/api/admin/stats -H "X-Admin-Token: dev-admin-token"
+```
+
+### Other
+
+- `GET /actuator/health` - `{"status":"UP"}` when the app is running
+- Searches are rate-limited to 60 per minute per IP (`429` + `Retry-After` beyond that)
+
+## Deployment
+
+See **[DEPLOY.md](DEPLOY.md)**: Render (backend) + Neon (PostgreSQL) + Vercel (frontend),
+a free `.me` domain, Cloudflare Web Analytics and a nightly sync via GitHub Actions - all on
+free plans with no card required.
 
 ## Configuration
 
@@ -223,8 +242,12 @@ All settings are in `backend/src/main/resources/application.yml` under `app.*`. 
 
 | Property                             | Default        | Meaning                                 |
 |--------------------------------------|----------------|-----------------------------------------|
-| `app.cors.allowed-origins`           | `http://localhost:5173` | Vite dev server                |
-| `app.coursera.enabled`               | `true`         | Turn the Coursera connector/scheduler off |
+| `app.cors.allowed-origins`           | `http://localhost:5173` | From `CORS_ALLOWED_ORIGINS` (comma-separated) |
+| `app.admin.token`                    | empty (`dev-admin-token` in dev) | From `ADMIN_TOKEN`; empty locks admin endpoints |
+| `app.rate-limit.search-requests-per-minute` | `60`    | Per IP; `0` turns the limit off         |
+| `app.stats.time-zone`                | `Asia/Kolkata` | Day boundaries in `/api/admin/stats`    |
+| `app.coursera.enabled`               | `true`         | Turn the Coursera connector off         |
+| `app.coursera.scheduled-sync`        | `true` (`false` in prod) | In-app nightly sync           |
 | `app.coursera.sync-cron`             | `0 0 3 * * *`  | Nightly sync time (server time zone)    |
 | `app.youtube.cache-ttl`              | `7d`           | How long a fetched topic stays fresh    |
 | `app.youtube.daily-quota-units`      | `9000`         | Our own daily budget (YouTube allows 10,000) |

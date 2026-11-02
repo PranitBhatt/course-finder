@@ -1,0 +1,40 @@
+# Production on Render (free web service, 512 MB) + Neon (free Postgres).
+# Activated with SPRING_PROFILES_ACTIVE=prod. The database comes from DATABASE_URL,
+# parsed by com.coursefinder.config.DatabaseUrlConfig (the spring.datasource.url above is unused).
+
+spring:
+  datasource:
+    hikari:
+      # Small pool for the free database plan.
+      maximum-pool-size: 5
+      # No idle connections kept open: lets Neon's free compute suspend when nobody searches,
+      # which saves its monthly compute hours.
+      minimum-idle: 0
+      idle-timeout: 60000
+      max-lifetime: 300000
+      connection-timeout: 20000
+
+server:
+  # Render terminates HTTPS and forwards the client IP in X-Forwarded-For.
+  # "native" lets Tomcat read it, so rate limiting sees real client IPs.
+  forward-headers-strategy: native
+
+management:
+  health:
+    # Health checks must not wake the database every few seconds (Neon compute hours).
+    db:
+      enabled: false
+
+app:
+  coursera:
+    # Free instances sleep and restart, so in-app cron is unreliable.
+    # .github/workflows/nightly-sync.yml triggers the sync instead.
+    scheduled-sync: false
+
+logging:
+  # One line per event, easy to read in the Render log viewer.
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"
+  level:
+    root: INFO
+    com.coursefinder: INFO

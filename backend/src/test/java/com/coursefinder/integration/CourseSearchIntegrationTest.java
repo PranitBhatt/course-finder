@@ -27,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -39,10 +40,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
         "app.coursera.enabled=false",
         "app.youtube.api-key=",
-        "app.admin.enabled=true"
+        "app.admin.token=" + CourseSearchIntegrationTest.ADMIN_TOKEN
 })
 @AutoConfigureMockMvc
 class CourseSearchIntegrationTest {
+
+    static final String ADMIN_TOKEN = "test-admin-token";
 
     @Container
     @ServiceConnection
@@ -212,8 +215,64 @@ class CourseSearchIntegrationTest {
 
     @Test
     void adminSyncRejectsOnDemandSource() throws Exception {
-        mockMvc.perform(post("/api/admin/sync/youtube"))
+        mockMvc.perform(post("/api/admin/sync/youtube").header("X-Admin-Token", ADMIN_TOKEN))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("Sync not supported"));
+    }
+
+    @Test
+    void adminEndpointsRequireTheToken() throws Exception {
+        mockMvc.perform(post("/api/admin/sync/COURSERA"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
+
+        mockMvc.perform(get("/api/admin/stats").header("X-Admin-Token", "wrong"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void rejectedRequestsStillCarryCorsHeaders() throws Exception {
+        mockMvc.perform(get("/api/admin/stats").header("Origin", "http://localhost:5173"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
+    }
+
+    @Test
+    void searchesAreLoggedAndShowUpInStats() throws Exception {
+        // Other tests search too; let their async log inserts land, then start clean.
+        Thread.sleep(300);
+        jdbcTemplate.execute("TRUNCATE search_log");
+
+        mockMvc.perform(get("/api/courses/search").param("q", "  Machine   Learning "))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/courses/search").param("q", "machine learning").param("page", "1"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/courses/search").param("q", "underwater basket weaving"))
+                .andExpect(status().isOk());
+
+        // Logging is asynchronous: wait until both first-page searches are stored.
+        for (int i = 0; i < 50 && countSearchLog() < 2; i++) {
+            Thread.sleep(100);
+        }
+        Thread.sleep(200); // make sure the page-1 request was not logged late either
+        assertThat(countSearchLog()).isEqualTo(2);
+
+        mockMvc.perform(get("/api/admin/stats").header("X-Admin-Token", ADMIN_TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalSearches").value(2))
+                .andExpect(jsonPath("$.timeZone").value("Asia/Kolkata"))
+                .andExpect(jsonPath("$.searchesPerDay.length()").value(30))
+                .andExpect(jsonPath("$.searchesPerDay[29].searches").value(2))
+                .andExpect(jsonPath("$.topQueries[0].searches").value(1))
+                .andExpect(jsonPath("$.topZeroResultQueries.length()").value(1))
+                .andExpect(jsonPath("$.topZeroResultQueries[0].query").value("underwater basket weaving"));
+
+        assertThat(jdbcTemplate.queryForList("SELECT query FROM search_log ORDER BY query", String.class))
+                .containsExactly("machine learning", "underwater basket weaving");
+    }
+
+    private long countSearchLog() {
+        Long count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM search_log", Long.class);
+        return count == null ? 0 : count;
     }
 }

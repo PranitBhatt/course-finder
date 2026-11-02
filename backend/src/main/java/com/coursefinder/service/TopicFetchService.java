@@ -9,6 +9,7 @@ import com.coursefinder.entity.CourseSource;
 import com.coursefinder.entity.TopicFetch;
 import com.coursefinder.repository.CourseRepository;
 import com.coursefinder.repository.TopicFetchRepository;
+import com.coursefinder.util.QueryNormalizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -17,7 +18,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
@@ -65,7 +65,7 @@ public class TopicFetchService {
      * "machine learning" share one cache entry.
      */
     public static String normalizeTopic(String topic) {
-        return topic.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
+        return QueryNormalizer.normalize(topic);
     }
 
     /**

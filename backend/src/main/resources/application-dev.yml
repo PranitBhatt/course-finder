@@ -1,6 +1,7 @@
 app:
   admin:
-    enabled: true
+    # Fixed token for local development only. Prod reads ADMIN_TOKEN from the environment.
+    token: ${ADMIN_TOKEN:dev-admin-token}
 
 logging:
   level:

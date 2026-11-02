@@ -2,6 +2,12 @@ import type { CourseSearchResponse, ProblemDetail, SearchParams, SourceInfo } fr
 
 export const PAGE_SIZE = 12;
 
+/**
+ * Backend origin, e.g. https://course-finder-api.onrender.com. Empty in local development,
+ * where requests go to /api on the Vite dev server and are proxied to localhost:8080.
+ */
+const API_BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
+
 const UNREACHABLE_MESSAGE = "Can't reach the server. Is the backend running?";
 
 /** Thrown for any failed API call, with a message that is safe to show to users. */
@@ -18,12 +24,17 @@ export class ApiError extends Error {
   get isNetworkError(): boolean {
     return this.status === null || this.status === 502 || this.status === 503 || this.status === 504;
   }
+
+  /** The per-IP search limit was hit (HTTP 429). */
+  get isRateLimited(): boolean {
+    return this.status === 429;
+  }
 }
 
 async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(path, { signal, headers: { Accept: 'application/json' } });
+    response = await fetch(API_BASE + path, { signal, headers: { Accept: 'application/json' } });
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error;
     throw new ApiError(UNREACHABLE_MESSAGE, null);

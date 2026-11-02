@@ -1,23 +1,34 @@
-# Secrets
+# ---------- Secrets: never commit ----------
+# Any .env file in any folder (.env, .env.local, .env.production, ...), except the documented templates.
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
 
-# Java / Maven
+# ---------- Java / Maven ----------
 backend/target/
 *.class
 *.log
 
-# IntelliJ
+# ---------- Node / Vite ----------
+node_modules/
+frontend/dist/
+*.local
+
+# ---------- Hosting CLIs ----------
+.vercel/
+.render/
+
+# ---------- Editors ----------
 .idea/
 *.iml
 out/
-
-# VS Code
 .vscode/
+.claude/settings.local.json
 
-# Node / Vite
-frontend/node_modules/
-frontend/dist/
-
-# OS
+# ---------- OS ----------
 .DS_Store
 Thumbs.db
