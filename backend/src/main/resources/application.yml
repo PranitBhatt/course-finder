@@ -75,6 +75,8 @@ app:
     expiration: 7d
     # Daily cleanup of expired tokens (RefreshTokenCleanupJob).
     cleanup-cron: "0 30 4 * * *"
+    # The refresh token cookie is HTTPS-only. Turned off in application-dev.yml for http://localhost.
+    cookie-secure: true
 
   admin:
     # Required in the X-Admin-Token header for /api/admin/**. Empty = admin endpoints always 401.

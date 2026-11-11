@@ -5,8 +5,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import java.time.Duration;
 
 /**
- * @param expiration how long a refresh token can be used to get new access tokens
+ * @param expiration   how long a refresh token can be used to get new access tokens
+ * @param cookieSecure whether the refresh token cookie is only sent over HTTPS (false for local http)
  */
 @ConfigurationProperties(prefix = "app.refresh-token")
-public record RefreshTokenProperties(Duration expiration) {
+public record RefreshTokenProperties(Duration expiration, boolean cookieSecure) {
 }
