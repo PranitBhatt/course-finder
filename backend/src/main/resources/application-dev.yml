@@ -5,8 +5,9 @@ app:
       enabled: true
 
   jwt:
-    # Local development only. Anyone who knows this can create valid tokens.
-    secret: ${JWT_SECRET:dev-only-jwt-secret-do-not-use-in-prod-0123456789}
+    # No JWT_PRIVATE_KEY locally? Then a temporary key is generated at startup (with a warning).
+    # Tokens from before a restart stop working; the frontend just refreshes.
+    generate-key-if-missing: true
 
   refresh-token:
     # Local backend runs on plain http, so a Secure cookie would never be stored.

@@ -1,5 +1,7 @@
 package com.coursefinder.dto.response;
 
+import com.coursefinder.entity.Role;
+
 import java.time.Instant;
 
 /**
@@ -10,6 +12,7 @@ public record UserDto(
         Long id,
         String email,
         String displayName,
+        Role role,
         Instant createdAt
 ) {
 }

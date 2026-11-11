@@ -64,9 +64,16 @@ app:
     fuzzy-threshold: 0.4
 
   jwt:
-    # HMAC key for signing access tokens, at least 32 bytes. No default here on purpose:
-    # set JWT_SECRET before enabling auth in prod (e.g. output of `openssl rand -base64 48`).
-    secret: ${JWT_SECRET:}
+    # RSA private key for signing access tokens (RS256): a PKCS#8 PEM, base64-encoded into one line.
+    # No default on purpose: with auth enabled and no key, startup fails. See .env.example.
+    private-key: ${JWT_PRIVATE_KEY:}
+    # Written into every token header as "kid", so keys can be swapped later without breaking old tokens.
+    key-id: ${JWT_KEY_ID:}
+    # Checked on every incoming token: a token from another issuer, or meant for another audience, is refused.
+    issuer: ${JWT_ISSUER:course-finder-api}
+    audience: ${JWT_AUDIENCE:course-finder-web}
+    # Only application-dev.yml turns this on.
+    generate-key-if-missing: false
     # Short on purpose: an access token can't be revoked, so a stolen one should stop working soon.
     access-token-expiration: 15m
 

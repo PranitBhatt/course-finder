@@ -81,9 +81,11 @@ public class AuthController {
             throw new InvalidRefreshTokenException();
         }
         IssuedTokens tokens = sessionService.refresh(refreshToken);
+        // Read the role fresh from the database, so a role change takes effect at the next refresh.
+        UserDto user = userService.getById(tokens.userId());
 
         AccessTokenResponse body = new AccessTokenResponse(
-                jwtService.createToken(tokens.userId(), tokens.sessionId()), jwtService.getExpiration().toSeconds());
+                jwtService.createToken(user.id(), tokens.sessionId(), user.role()), jwtService.getExpiration().toSeconds());
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie(tokens))
                 .body(body);
@@ -115,7 +117,7 @@ public class AuthController {
                 user.id(), httpRequest.getHeader(HttpHeaders.USER_AGENT), httpRequest.getRemoteAddr());
 
         AuthResponse body = new AuthResponse(
-                jwtService.createToken(user.id(), tokens.sessionId()), jwtService.getExpiration().toSeconds(), user);
+                jwtService.createToken(user.id(), tokens.sessionId(), user.role()), jwtService.getExpiration().toSeconds(), user);
         return ResponseEntity.status(status)
                 .header(HttpHeaders.SET_COOKIE, refreshCookie(tokens))
                 .body(body);

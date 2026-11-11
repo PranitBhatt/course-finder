@@ -1,69 +1,71 @@
 package com.coursefinder.security;
 
 import com.coursefinder.config.properties.JwtProperties;
-import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
+import com.coursefinder.entity.Role;
+import com.nimbusds.jose.jwk.RSAKey;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
+import org.springframework.security.oauth2.jwt.JwsHeader;
+import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
 
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 
 /**
- * Creates and checks JWT access tokens.
+ * Creates access tokens. Checking them is Spring Security's job now (JwtDecoder in JwtKeyConfig,
+ * wired into SecurityConfig) - we only write the tokens.
  * <p>
- * Only exists when auth is enabled, so prod doesn't need JWT_SECRET until auth is switched on there.
+ * Only exists when auth is enabled (it needs the key from JwtKeyConfig).
  */
 @Service
 @ConditionalOnProperty(prefix = "app.features.auth", name = "enabled", havingValue = "true")
 public class JwtService {
 
-    private final SecretKey key;
-    private final Duration expiration;
+    private final JwtEncoder jwtEncoder;
+    private final JwtProperties properties;
+    private final String keyId;
 
-    public JwtService(JwtProperties properties) {
-        // hmacShaKeyFor refuses keys shorter than 256 bits (32 bytes), which HS256 requires.
-        // That's on purpose: with auth enabled and JWT_SECRET missing or short, the app fails
-        // at startup instead of signing tokens with a guessable key.
-        this.key = Keys.hmacShaKeyFor(properties.secret().getBytes(StandardCharsets.UTF_8));
-        this.expiration = properties.accessTokenExpiration();
+    public JwtService(JwtEncoder jwtEncoder, RSAKey jwtSigningKey, JwtProperties properties) {
+        this.jwtEncoder = jwtEncoder;
+        this.properties = properties;
+        this.keyId = jwtSigningKey.getKeyID();
     }
 
-    public String createToken(Long userId, UUID sessionId) {
+    public String createToken(Long userId, UUID sessionId, Role role) {
         Instant now = Instant.now();
-        return Jwts.builder()
+
+        // "kid" (key id) tells the verifier which key signed this token. That makes it possible to
+        // switch to a new key later while tokens signed with the old one are still around.
+        JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).keyId(keyId).build();
+
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                // "iss" = who made the token, "aud" = who it's for. Both are checked when it comes back.
+                .issuer(properties.issuer())
+                .audience(List.of(properties.audience()))
                 // "sub" (subject) = who the token is about. The id never changes, unlike the email.
                 .subject(String.valueOf(userId))
+                .issuedAt(now)
+                .expiresAt(now.plus(properties.accessTokenExpiration()))
+                // "jti" = a unique id for this one token, so a specific token can be told apart
+                // from every other one (e.g. in logs, or to block it later).
+                .id(UUID.randomUUID().toString())
                 // "sid" = which login session issued it, so a request can be tied to a session.
                 .claim("sid", sessionId.toString())
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plus(expiration)))
-                .signWith(key, Jwts.SIG.HS256)
-                .compact();
+                // A list, because a user may have several roles one day. SecurityConfig turns
+                // ["USER"] into the Spring authority ROLE_USER.
+                .claim("roles", List.of(role.name()))
+                .build();
+
+        return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
     }
 
     /** How long a new access token is valid; sent to the client as "expiresIn". */
     public Duration getExpiration() {
-        return expiration;
-    }
-
-    /**
-     * Returns the user id from a valid token.
-     * Throws {@link JwtException} if the signature doesn't match (token was changed),
-     * it has expired, or it isn't a JWT at all.
-     */
-    public Long parseUserId(String token) {
-        String subject = Jwts.parser()
-                .verifyWith(key)
-                .build()
-                .parseSignedClaims(token)
-                .getPayload()
-                .getSubject();
-        return Long.valueOf(subject);
+        return properties.accessTokenExpiration();
     }
 }

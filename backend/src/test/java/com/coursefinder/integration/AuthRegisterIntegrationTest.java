@@ -1,5 +1,6 @@
 package com.coursefinder.integration;
 
+import com.coursefinder.support.TestJwtKeys;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,6 +9,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -27,7 +30,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
         // The flag is off by default; the controller only exists when it is on.
         "app.features.auth.enabled=true",
-        "app.jwt.secret=test-jwt-secret-at-least-32-bytes-long",
         "app.coursera.enabled=false",
         "app.youtube.api-key="
 })
@@ -37,6 +39,12 @@ class AuthRegisterIntegrationTest {
     @Container
     @ServiceConnection
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
+
+    // A test RSA key, passed in like JWT_PRIVATE_KEY would be in production.
+    @DynamicPropertySource
+    static void jwtKeys(DynamicPropertyRegistry registry) {
+        TestJwtKeys.register(registry);
+    }
 
     @Autowired
     private MockMvc mockMvc;

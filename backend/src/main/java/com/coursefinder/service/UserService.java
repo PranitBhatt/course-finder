@@ -80,6 +80,6 @@ public class UserService {
 
     // Map by hand so the password hash can never end up in a response.
     private static UserDto toDto(AppUser user) {
-        return new UserDto(user.getId(), user.getEmail(), user.getDisplayName(), user.getCreatedAt());
+        return new UserDto(user.getId(), user.getEmail(), user.getDisplayName(), user.getRole(), user.getCreatedAt());
     }
 }

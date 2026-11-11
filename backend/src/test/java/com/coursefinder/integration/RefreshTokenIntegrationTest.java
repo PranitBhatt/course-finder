@@ -1,5 +1,6 @@
 package com.coursefinder.integration;
 
+import com.coursefinder.support.TestJwtKeys;
 import com.coursefinder.security.RefreshTokenCookies;
 import com.coursefinder.security.TokenHasher;
 import com.jayway.jsonpath.JsonPath;
@@ -13,6 +14,8 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
@@ -46,7 +49,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(properties = {
         "app.features.auth.enabled=true",
-        "app.jwt.secret=test-jwt-secret-at-least-32-bytes-long",
         "app.cors.allowed-origins=" + RefreshTokenIntegrationTest.FRONTEND_ORIGIN,
         "app.coursera.enabled=false",
         "app.youtube.api-key="
@@ -59,6 +61,12 @@ class RefreshTokenIntegrationTest {
     @Container
     @ServiceConnection
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
+
+    // A test RSA key, passed in like JWT_PRIVATE_KEY would be in production.
+    @DynamicPropertySource
+    static void jwtKeys(DynamicPropertyRegistry registry) {
+        TestJwtKeys.register(registry);
+    }
 
     @Autowired
     private MockMvc mockMvc;

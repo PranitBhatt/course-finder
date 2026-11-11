@@ -1,6 +1,13 @@
 package com.coursefinder.integration;
 
+import com.coursefinder.config.properties.JwtProperties;
+import com.coursefinder.entity.Role;
+import com.coursefinder.security.JwtService;
+import com.coursefinder.support.TestJwtKeys;
 import com.jayway.jsonpath.JsonPath;
+import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.RSAKey;
+import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,6 +16,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -16,6 +26,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -32,7 +43,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(properties = {
         "app.features.auth.enabled=true",
-        "app.jwt.secret=test-jwt-secret-at-least-32-bytes-long",
         "app.admin.token=" + SecurityIntegrationTest.ADMIN_TOKEN,
         "app.coursera.enabled=false",
         "app.youtube.api-key="
@@ -46,10 +56,18 @@ class SecurityIntegrationTest {
     @ServiceConnection
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
 
+    // A test RSA key, passed in like JWT_PRIVATE_KEY would be in production.
+    @DynamicPropertySource
+    static void jwtKeys(DynamicPropertyRegistry registry) {
+        TestJwtKeys.register(registry);
+    }
+
     @Autowired
     private MockMvc mockMvc;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private JwtProperties jwtProperties;
 
     @BeforeEach
     void cleanUsers() {
@@ -99,6 +117,42 @@ class SecurityIntegrationTest {
     void guestSearchWithoutTokenStillWorks() throws Exception {
         mockMvc.perform(get("/api/courses/search").param("q", "python"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void guestSearchWithABadTokenStillWorks() throws Exception {
+        // Spring would answer 401 for any bad token; on public endpoints we ignore the token instead,
+        // so a user whose old token expired can still search.
+        mockMvc.perform(get("/api/courses/search").param("q", "python").header("Authorization", "Bearer not-a-jwt"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void meWithTokenSignedByAnotherKeyReturns401() throws Exception {
+        registerAndLogin("ada@example.com");
+
+        // Correct claims for user 1, correct kid - but signed with a key that isn't ours.
+        RSAKey otherKey = TestJwtKeys.generate(TestJwtKeys.KEY_ID);
+        JwtService forger = new JwtService(new NimbusJwtEncoder(new ImmutableJWKSet<>(new JWKSet(otherKey))),
+                otherKey, jwtProperties);
+        String forgedToken = forger.createToken(1L, UUID.randomUUID(), Role.ADMIN);
+
+        mockMvc.perform(get("/api/me").header("Authorization", "Bearer " + forgedToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @Test
+    void jwksEndpointPublishesOnlyThePublicKey() throws Exception {
+        mockMvc.perform(get("/.well-known/jwks.json"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.keys[0].kid").value(TestJwtKeys.KEY_ID))
+                .andExpect(jsonPath("$.keys[0].kty").value("RSA"))
+                .andExpect(jsonPath("$.keys[0].n").isString())
+                // "d", "p", "q" are parts of the PRIVATE key and must never be published.
+                .andExpect(jsonPath("$.keys[0].d").doesNotExist())
+                .andExpect(jsonPath("$.keys[0].p").doesNotExist())
+                .andExpect(jsonPath("$.keys[0].q").doesNotExist());
     }
 
     @Test
