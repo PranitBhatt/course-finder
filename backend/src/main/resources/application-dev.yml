@@ -4,6 +4,10 @@ app:
       # Auth is still a work in progress, so it's only on locally for now.
       enabled: true
 
+  jwt:
+    # Local development only. Anyone who knows this can create valid tokens.
+    secret: ${JWT_SECRET:dev-only-jwt-secret-do-not-use-in-prod-0123456789}
+
   admin:
     # Fixed token for local development only. Prod reads ADMIN_TOKEN from the environment.
     token: ${ADMIN_TOKEN:dev-admin-token}

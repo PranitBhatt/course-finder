@@ -63,6 +63,12 @@ app:
     # Typo tolerance: min trigram word similarity (0-1). Lower = more forgiving, more noise.
     fuzzy-threshold: 0.4
 
+  jwt:
+    # HMAC key for signing access tokens, at least 32 bytes. No default here on purpose:
+    # set JWT_SECRET before enabling auth in prod (e.g. output of `openssl rand -base64 48`).
+    secret: ${JWT_SECRET:}
+    expiration: 7d
+
   admin:
     # Required in the X-Admin-Token header for /api/admin/**. Empty = admin endpoints always 401.
     token: ${ADMIN_TOKEN:}

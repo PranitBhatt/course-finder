@@ -6,6 +6,7 @@ import com.coursefinder.dto.response.UserDto;
 import com.coursefinder.entity.AppUser;
 import com.coursefinder.exception.EmailAlreadyRegisteredException;
 import com.coursefinder.exception.InvalidCredentialsException;
+import com.coursefinder.exception.ResourceNotFoundException;
 import com.coursefinder.repository.AppUserRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -61,6 +62,13 @@ public class UserService {
         }
 
         return toDto(user);
+    }
+
+    @Transactional(readOnly = true)
+    public UserDto getById(Long id) {
+        return appUserRepository.findById(id)
+                .map(UserService::toDto)
+                .orElseThrow(() -> new ResourceNotFoundException("User", id));
     }
 
     // Locale.ROOT instead of the server's default locale: in some locales (e.g. Turkish)

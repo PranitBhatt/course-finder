@@ -27,6 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
         // The flag is off by default; the controller only exists when it is on.
         "app.features.auth.enabled=true",
+        "app.jwt.secret=test-jwt-secret-at-least-32-bytes-long",
         "app.coursera.enabled=false",
         "app.youtube.api-key="
 })
@@ -51,13 +52,14 @@ class AuthRegisterIntegrationTest {
     void registerCreatesUserAndRejectsDuplicateEmail() throws Exception {
         register("ada@example.com", "secret123")
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").isNumber())
-                .andExpect(jsonPath("$.email").value("ada@example.com"))
-                .andExpect(jsonPath("$.displayName").value("Ada"))
-                .andExpect(jsonPath("$.createdAt").exists())
+                .andExpect(jsonPath("$.token").isString())
+                .andExpect(jsonPath("$.user.id").isNumber())
+                .andExpect(jsonPath("$.user.email").value("ada@example.com"))
+                .andExpect(jsonPath("$.user.displayName").value("Ada"))
+                .andExpect(jsonPath("$.user.createdAt").exists())
                 // The response must never leak the password or its hash.
-                .andExpect(jsonPath("$.password").doesNotExist())
-                .andExpect(jsonPath("$.passwordHash").doesNotExist());
+                .andExpect(jsonPath("$.user.password").doesNotExist())
+                .andExpect(jsonPath("$.user.passwordHash").doesNotExist());
 
         register("ada@example.com", "secret123")
                 .andExpect(status().isConflict())
@@ -69,7 +71,7 @@ class AuthRegisterIntegrationTest {
     void mixedCaseEmailIsTreatedAsTheSameAccount() throws Exception {
         register("  Ada@Example.COM ", "secret123")
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.email").value("ada@example.com"));
+                .andExpect(jsonPath("$.user.email").value("ada@example.com"));
 
         register("ada@example.com", "secret123")
                 .andExpect(status().isConflict());
@@ -82,9 +84,10 @@ class AuthRegisterIntegrationTest {
         // Different case than at registration: login normalizes the email too.
         login("ADA@example.com", "secret123")
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.email").value("ada@example.com"))
-                .andExpect(jsonPath("$.displayName").value("Ada"))
-                .andExpect(jsonPath("$.passwordHash").doesNotExist());
+                .andExpect(jsonPath("$.token").isString())
+                .andExpect(jsonPath("$.user.email").value("ada@example.com"))
+                .andExpect(jsonPath("$.user.displayName").value("Ada"))
+                .andExpect(jsonPath("$.user.passwordHash").doesNotExist());
     }
 
     @Test

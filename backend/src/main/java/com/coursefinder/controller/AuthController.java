@@ -2,7 +2,9 @@ package com.coursefinder.controller;
 
 import com.coursefinder.dto.request.LoginRequest;
 import com.coursefinder.dto.request.RegisterRequest;
+import com.coursefinder.dto.response.AuthResponse;
 import com.coursefinder.dto.response.UserDto;
+import com.coursefinder.security.JwtService;
 import com.coursefinder.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -27,21 +29,26 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final UserService userService;
+    private final JwtService jwtService;
 
-    public AuthController(UserService userService) {
+    public AuthController(UserService userService, JwtService jwtService) {
         this.userService = userService;
+        this.jwtService = jwtService;
     }
 
-    /** {@code POST /api/auth/register} - creates an account, 409 if the email is taken. */
+    /** {@code POST /api/auth/register} - creates an account and logs it in, 409 if the email is taken. */
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
-    public UserDto register(@Valid @RequestBody RegisterRequest request) {
-        return userService.register(request);
+    public AuthResponse register(@Valid @RequestBody RegisterRequest request) {
+        UserDto user = userService.register(request);
+        // Return a token right away so the user doesn't have to log in again after signing up.
+        return new AuthResponse(jwtService.createToken(user.id()), user);
     }
 
-    /** {@code POST /api/auth/login} - 200 with the user if the email and password match, otherwise 401. */
+    /** {@code POST /api/auth/login} - 200 with a token if the email and password match, otherwise 401. */
     @PostMapping("/login")
-    public UserDto login(@Valid @RequestBody LoginRequest request) {
-        return userService.login(request);
+    public AuthResponse login(@Valid @RequestBody LoginRequest request) {
+        UserDto user = userService.login(request);
+        return new AuthResponse(jwtService.createToken(user.id()), user);
     }
 }

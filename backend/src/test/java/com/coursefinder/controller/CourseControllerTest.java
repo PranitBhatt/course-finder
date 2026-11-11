@@ -1,6 +1,7 @@
 package com.coursefinder.controller;
 
 import com.coursefinder.config.CorsConfig;
+import com.coursefinder.config.SecurityConfig;
 import com.coursefinder.dto.request.CourseSearchRequest;
 import com.coursefinder.dto.response.CourseDto;
 import com.coursefinder.dto.response.CourseSearchResponse;
@@ -34,7 +35,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /** Web layer only: request binding, validation, error format, CORS. Services are mocked. */
 @WebMvcTest(CourseController.class)
-@Import(CorsConfig.class)
+// SecurityConfig is needed, otherwise the test slice uses Spring Security's default (everything locked).
+@Import({CorsConfig.class, SecurityConfig.class})
 class CourseControllerTest {
 
     @Autowired
