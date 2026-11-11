@@ -32,8 +32,10 @@ public class SecurityConfig {
 
         http
                 // CSRF tricks a browser into sending a request with the cookies it already has.
-                // We don't use cookies: the token must be added to the Authorization header by our
-                // own JavaScript, which another site can't do. So there is nothing for CSRF to abuse.
+                // The access token isn't a cookie: our own JavaScript adds it to the Authorization
+                // header, which another site can't do. The one cookie we have (the refresh token) is
+                // only sent to /api/auth and is protected there by SameSite=Lax plus OriginCheckFilter,
+                // so Spring's token-based CSRF protection isn't needed.
                 .csrf(csrf -> csrf.disable())
                 // No HTTP session: every request proves who it is with its own token.
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

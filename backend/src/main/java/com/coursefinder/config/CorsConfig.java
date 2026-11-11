@@ -31,6 +31,9 @@ public class CorsConfig {
         config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(List.of("Retry-After", "X-RateLimit-Remaining"));
         config.setMaxAge(3600L);
+        // Lets the frontend send and receive the refresh token cookie (fetch with credentials: "include").
+        // Only safe because allowed origins is an exact list; browsers refuse it together with "*".
+        config.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", config);

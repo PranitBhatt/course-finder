@@ -8,6 +8,10 @@ app:
     # Local development only. Anyone who knows this can create valid tokens.
     secret: ${JWT_SECRET:dev-only-jwt-secret-do-not-use-in-prod-0123456789}
 
+  refresh-token:
+    # Local backend runs on plain http, so a Secure cookie would never be stored.
+    cookie-secure: false
+
   admin:
     # Fixed token for local development only. Prod reads ADMIN_TOKEN from the environment.
     token: ${ADMIN_TOKEN:dev-admin-token}
