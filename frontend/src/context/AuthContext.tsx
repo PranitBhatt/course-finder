@@ -1,11 +1,6 @@
-import { createContext, useEffect, useState, type ReactNode } from 'react';
-import { clearAccessToken, setAccessToken } from '../api/accessToken';
-import {
-  login as loginRequest,
-  logout as logoutRequest,
-  refreshSession,
-  register as registerRequest,
-} from '../api/client';
+import { createContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { login as loginRequest, logout as logoutRequest, register as registerRequest } from '../api/client';
+import { endSession, refreshOnce, setSessionExpiredHandler, startSession } from '../api/session';
 import type { User } from '../api/types';
 
 /**
@@ -21,6 +16,13 @@ export const AUTH_ENABLED = import.meta.env.VITE_AUTH_ENABLED === 'true';
  * secret an XSS bug could steal.
  */
 const OLD_TOKEN_KEYS = ['courseFinder.token', 'courseFinder.accessToken', 'courseFinder.refreshToken'];
+
+/**
+ * A BroadcastChannel delivers messages to every other tab of our site that opened a channel
+ * with the same name. We use it for one message: "logout".
+ */
+const AUTH_CHANNEL_NAME = 'courseFinder.auth';
+const LOGOUT_MESSAGE = 'logout';
 
 export interface AuthContextValue {
   user: User | null;
@@ -39,6 +41,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // to find out if someone is logged in is to ask the backend, so with auth on we always
   // start in "loading".
   const [loading, setLoading] = useState(AUTH_ENABLED);
+  // Kept in a ref so logout() can post on the same channel the effect below opened.
+  const channelRef = useRef<BroadcastChannel | null>(null);
 
   useEffect(() => {
     // Delete old tokens even with the flag off: there's no reason to keep secrets lying around.
@@ -46,39 +50,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!AUTH_ENABLED) return;
 
-    // AbortController lets us cancel the request if this effect is cleaned up
-    // (React StrictMode runs effects twice in development).
-    const controller = new AbortController();
+    // If a refresh fails later (proactive timer, or a 401 that couldn't be fixed),
+    // session.ts calls this so the header and RequireAuth see a guest again.
+    setSessionExpiredHandler(() => setUser(null));
+
+    // Another tab signed out: the cookie is already gone, so just forget the user here.
+    // We do NOT call /auth/logout again; the tab that sent the message already did.
+    const channel = new BroadcastChannel(AUTH_CHANNEL_NAME);
+    channel.onmessage = (event: MessageEvent) => {
+      if (event.data === LOGOUT_MESSAGE) {
+        endSession();
+        setUser(null);
+      }
+    };
+    channelRef.current = channel;
+
+    // We can't abort the refresh (see refreshOnce), so instead we ignore its answer if this
+    // effect was cleaned up. In development StrictMode runs this effect twice; both runs get
+    // the SAME in-flight refresh from refreshOnce, so only one request is sent.
+    let ignore = false;
 
     // Silent check: the browser sends the cookie if there is one.
-    refreshSession(controller.signal)
+    refreshOnce()
       .then((session) => {
-        setAccessToken(session.accessToken);
+        if (ignore) return;
         setUser(session.user);
         setLoading(false);
       })
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === 'AbortError') return;
+      .catch(() => {
+        if (ignore) return;
         // 401 just means "no session", the normal case for a guest. It isn't an error, so we
         // show nothing. Same if the server can't be reached: we treat the visitor as a guest.
-        clearAccessToken();
         setUser(null);
         setLoading(false);
       });
 
-    return () => controller.abort();
+    return () => {
+      ignore = true;
+      setSessionExpiredHandler(null);
+      channel.close();
+      channelRef.current = null;
+    };
   }, []);
 
   async function login(email: string, password: string) {
     // The backend also sets the refresh cookie on this response; the browser stores it for us.
     const response = await loginRequest(email, password);
-    setAccessToken(response.accessToken);
+    startSession(response);
     setUser(response.user);
   }
 
   async function register(email: string, password: string, displayName: string) {
     const response = await registerRequest(email, password, displayName);
-    setAccessToken(response.accessToken);
+    startSession(response);
     setUser(response.user);
   }
 
@@ -89,9 +113,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // Server down: not a reason to keep the user signed in on this page.
     } finally {
-      // Always forget the user locally, whatever the server said.
-      clearAccessToken();
+      // Always forget the user locally, whatever the server said...
+      endSession();
       setUser(null);
+      // ...and tell the other tabs. A channel never receives its own messages, so this tab
+      // doesn't react to it.
+      channelRef.current?.postMessage(LOGOUT_MESSAGE);
     }
   }
 

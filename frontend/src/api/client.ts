@@ -1,5 +1,4 @@
-import { clearAccessToken, getAccessToken, setAccessToken } from './accessToken';
-import type { AuthResponse, CourseSearchResponse, ProblemDetail, SearchParams, SourceInfo, User } from './types';
+import type { AuthResponse, CourseSearchResponse, ProblemDetail, SearchParams, SourceInfo } from './types';
 
 export const PAGE_SIZE = 12;
 
@@ -35,48 +34,18 @@ export class ApiError extends Error {
   }
 }
 
-const SESSION_EXPIRED_MESSAGE = 'Your session has expired. Please sign in again.';
-
 /**
  * `token` is optional on purpose: only callers that really need to say who the user is
- * (via getJsonWithAuth) pass it. Every other call goes out without an Authorization header.
+ * (getJsonWithAuth in session.ts) pass it. Every other call goes out without an Authorization header.
  *
  * credentials: 'omit' means "send no cookies". Our API is same-origin now, so by default the
  * browser WOULD attach the refresh cookie to every request, search included. GET calls never
  * need it (/me uses the Bearer header), so we keep the cookie away from them.
  */
-async function getJson<T>(path: string, signal?: AbortSignal, token?: string): Promise<T> {
+export async function getJson<T>(path: string, signal?: AbortSignal, token?: string): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
   return sendRequest<T>(path, { signal, headers, credentials: 'omit' });
-}
-
-/**
- * GET for endpoints that need a logged-in user.
- * Access tokens are short-lived, so a 401 usually just means "your access token expired".
- * We ask /auth/refresh for a new one (the browser sends the cookie) and try the call ONE
- * more time. Only once, so a broken session can't cause an endless loop.
- */
-async function getJsonWithAuth<T>(path: string, signal?: AbortSignal): Promise<T> {
-  try {
-    return await getJson<T>(path, signal, getAccessToken() ?? undefined);
-  } catch (error) {
-    // Anything other than a 401 (server down, rate limit, ...) isn't a token problem.
-    if (!(error instanceof ApiError) || error.status !== 401) throw error;
-  }
-
-  try {
-    const refreshed = await refreshSession();
-    setAccessToken(refreshed.accessToken);
-  } catch {
-    // The cookie is missing, expired or revoked, or the call failed: the session is over.
-    // Forgetting the access token is the "log out locally" part; the caller resets the user.
-    clearAccessToken();
-    throw new ApiError(SESSION_EXPIRED_MESSAGE, 401);
-  }
-
-  // The retry. If this fails too (even with a 401), the error just goes to the caller.
-  return getJson<T>(path, signal, getAccessToken() ?? undefined);
 }
 
 /**
@@ -162,17 +131,15 @@ export function register(email: string, password: string, displayName: string): 
 /**
  * No body: the browser attaches the httpOnly cookie, which our JavaScript can't even read.
  * 200 gives a new access token plus the user; 401 means there is no valid session.
+ *
+ * Don't call this directly: use refreshOnce() from session.ts, which makes sure only one
+ * refresh runs at a time (refresh tokens rotate, so duplicates can kill the session).
  */
-export function refreshSession(signal?: AbortSignal): Promise<AuthResponse> {
-  return postJson<AuthResponse>('/api/auth/refresh', undefined, signal);
+export function refreshSession(): Promise<AuthResponse> {
+  return postJson<AuthResponse>('/api/auth/refresh');
 }
 
 /** The backend revokes the session and clears the cookie. Answers 204 with no body. */
 export function logout(): Promise<void> {
   return postJson<void>('/api/auth/logout');
-}
-
-/** The ONLY call that sends the access token: /me has to know who is asking. */
-export function fetchMe(signal?: AbortSignal): Promise<User> {
-  return getJsonWithAuth<User>('/api/me', signal);
 }
