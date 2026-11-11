@@ -14,8 +14,9 @@ public record RegisterRequest(
         @Size(max = 255, message = "must be at most 255 characters")
         String email,
 
+        // BCrypt only works with up to 72 bytes and rejects anything longer.
         @NotBlank(message = "must not be blank")
-        @Size(max = 255, message = "must be at most 255 characters")
+        @Size(max = 72, message = "must be at most 72 characters")
         String password,
 
         @NotBlank(message = "must not be blank")

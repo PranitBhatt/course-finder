@@ -51,6 +51,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.CONFLICT, "Email already registered", e.getMessage());
     }
 
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ProblemDetail handleInvalidCredentials(InvalidCredentialsException e) {
+        return problem(HttpStatus.UNAUTHORIZED, "Invalid credentials", e.getMessage());
+    }
+
     @ExceptionHandler(UnsupportedSyncException.class)
     public ProblemDetail handleUnsupportedSync(UnsupportedSyncException e) {
         return problem(HttpStatus.BAD_REQUEST, "Sync not supported", e.getMessage());

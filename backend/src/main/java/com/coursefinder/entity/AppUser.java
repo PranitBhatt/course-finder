@@ -23,10 +23,9 @@ public class AppUser {
     @Column(nullable = false, unique = true)
     private String email;
 
-    // TODO: stored as plain text for now - anyone who can read this table sees
-    // every password (and people reuse them elsewhere). Needs hashing.
-    @Column(nullable = false)
-    private String password;
+    // A BCrypt hash, never the real password. Login hashes what the user typed and compares.
+    @Column(name = "password_hash", nullable = false)
+    private String passwordHash;
 
     @Column(name = "display_name", nullable = false)
     private String displayName;
@@ -38,9 +37,9 @@ public class AppUser {
         // for JPA
     }
 
-    public AppUser(String email, String password, String displayName) {
+    public AppUser(String email, String passwordHash, String displayName) {
         this.email = email;
-        this.password = password;
+        this.passwordHash = passwordHash;
         this.displayName = displayName;
         this.createdAt = Instant.now();
     }
@@ -53,8 +52,8 @@ public class AppUser {
         return email;
     }
 
-    public String getPassword() {
-        return password;
+    public String getPasswordHash() {
+        return passwordHash;
     }
 
     public String getDisplayName() {

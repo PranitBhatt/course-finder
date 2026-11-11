@@ -1,5 +1,6 @@
 package com.coursefinder.controller;
 
+import com.coursefinder.dto.request.LoginRequest;
 import com.coursefinder.dto.request.RegisterRequest;
 import com.coursefinder.dto.response.UserDto;
 import com.coursefinder.service.UserService;
@@ -36,5 +37,11 @@ public class AuthController {
     @ResponseStatus(HttpStatus.CREATED)
     public UserDto register(@Valid @RequestBody RegisterRequest request) {
         return userService.register(request);
+    }
+
+    /** {@code POST /api/auth/login} - 200 with the user if the email and password match, otherwise 401. */
+    @PostMapping("/login")
+    public UserDto login(@Valid @RequestBody LoginRequest request) {
+        return userService.login(request);
     }
 }

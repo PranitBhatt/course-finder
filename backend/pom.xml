@@ -69,6 +69,14 @@
             <artifactId>caffeine</artifactId>
         </dependency>
 
+        <!-- Password hashing (BCryptPasswordEncoder) only. The full spring-boot-starter-security
+             is left out on purpose: as soon as it is on the classpath it locks every endpoint
+             behind a login by default, which would break public search and the admin token flow. -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+
         <!-- Generates metadata so IntelliJ autocompletes app.* properties -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
