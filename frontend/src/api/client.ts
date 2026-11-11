@@ -1,21 +1,16 @@
-import { clearTokens, getAccessToken, getRefreshToken, saveAccessToken } from './tokenStorage';
-import type {
-  AuthResponse,
-  CourseSearchResponse,
-  ProblemDetail,
-  RefreshResponse,
-  SearchParams,
-  SourceInfo,
-  User,
-} from './types';
+import { clearAccessToken, getAccessToken, setAccessToken } from './accessToken';
+import type { AuthResponse, CourseSearchResponse, ProblemDetail, SearchParams, SourceInfo, User } from './types';
 
 export const PAGE_SIZE = 12;
 
-/**
- * Backend origin, e.g. https://course-finder-api.onrender.com. Empty in local development,
- * where requests go to /api on the Vite dev server and are proxied to localhost:8080.
+/*
+ * Every URL below is RELATIVE (/api/...), so the browser always calls our own site:
+ *  - locally, the Vite dev server proxies /api to localhost:8080 (vite.config.ts)
+ *  - in production, Vercel proxies /api to Render (the rewrite in vercel.json)
+ * Because the API and the page share an origin, the refresh cookie is a normal first-party
+ * cookie. If the browser called the Render domain directly, the cookie would be third-party,
+ * and browsers block those.
  */
-const API_BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
 
 const UNREACHABLE_MESSAGE = "Can't reach the server. Is the backend running?";
 
@@ -45,18 +40,22 @@ const SESSION_EXPIRED_MESSAGE = 'Your session has expired. Please sign in again.
 /**
  * `token` is optional on purpose: only callers that really need to say who the user is
  * (via getJsonWithAuth) pass it. Every other call goes out without an Authorization header.
+ *
+ * credentials: 'omit' means "send no cookies". Our API is same-origin now, so by default the
+ * browser WOULD attach the refresh cookie to every request, search included. GET calls never
+ * need it (/me uses the Bearer header), so we keep the cookie away from them.
  */
 async function getJson<T>(path: string, signal?: AbortSignal, token?: string): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
-  return sendRequest<T>(path, { signal, headers });
+  return sendRequest<T>(path, { signal, headers, credentials: 'omit' });
 }
 
 /**
  * GET for endpoints that need a logged-in user.
  * Access tokens are short-lived, so a 401 usually just means "your access token expired".
- * Instead of logging the user out, we trade the refresh token for a new access token
- * and try the call ONE more time. Only once, so a broken token can't cause an endless loop.
+ * We ask /auth/refresh for a new one (the browser sends the cookie) and try the call ONE
+ * more time. Only once, so a broken session can't cause an endless loop.
  */
 async function getJsonWithAuth<T>(path: string, signal?: AbortSignal): Promise<T> {
   try {
@@ -66,19 +65,13 @@ async function getJsonWithAuth<T>(path: string, signal?: AbortSignal): Promise<T
     if (!(error instanceof ApiError) || error.status !== 401) throw error;
   }
 
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) {
-    clearTokens();
-    throw new ApiError(SESSION_EXPIRED_MESSAGE, 401);
-  }
-
   try {
-    const refreshed = await refreshAccessToken(refreshToken);
-    saveAccessToken(refreshed.accessToken);
+    const refreshed = await refreshSession();
+    setAccessToken(refreshed.accessToken);
   } catch {
-    // The refresh token is expired, revoked, or the call failed: the session is over.
-    // Clearing the tokens is the "log out locally" part; the caller resets the user.
-    clearTokens();
+    // The cookie is missing, expired or revoked, or the call failed: the session is over.
+    // Forgetting the access token is the "log out locally" part; the caller resets the user.
+    clearAccessToken();
     throw new ApiError(SESSION_EXPIRED_MESSAGE, 401);
   }
 
@@ -86,19 +79,31 @@ async function getJsonWithAuth<T>(path: string, signal?: AbortSignal): Promise<T
   return getJson<T>(path, signal, getAccessToken() ?? undefined);
 }
 
-/** POST a JSON body. Login, register, refresh and logout all send their data this way, without an access token. */
-async function postJson<T>(path: string, body: unknown): Promise<T> {
+/**
+ * POST to the auth endpoints. `body` is optional because refresh and logout send nothing:
+ * the httpOnly cookie is all the backend needs.
+ *
+ * credentials: 'same-origin' tells fetch to send cookies with the request AND to store the
+ * Set-Cookie from the response, as long as the URL is on our own origin. It's already fetch's
+ * default; we write it out because these are exactly the calls that depend on the cookie.
+ * We don't use 'include': that's for cross-site requests, which we no longer make.
+ */
+async function postJson<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
   return sendRequest<T>(path, {
     method: 'POST',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+    credentials: 'same-origin',
+    signal,
   });
 }
 
 async function sendRequest<T>(path: string, init: RequestInit): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(API_BASE + path, init);
+    response = await fetch(path, init);
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error;
     throw new ApiError(UNREACHABLE_MESSAGE, null);
@@ -144,22 +149,27 @@ export function fetchSources(signal?: AbortSignal): Promise<SourceInfo[]> {
   return getJson<SourceInfo[]>('/api/sources', signal);
 }
 
+/** Besides the JSON, the response sets the httpOnly refresh cookie. */
 export function login(email: string, password: string): Promise<AuthResponse> {
   return postJson<AuthResponse>('/api/auth/login', { email, password });
 }
 
+/** Besides the JSON, the response sets the httpOnly refresh cookie. */
 export function register(email: string, password: string, displayName: string): Promise<AuthResponse> {
   return postJson<AuthResponse>('/api/auth/register', { email, password, displayName });
 }
 
-/** The refresh token goes in the body, never in the Authorization header. */
-export function refreshAccessToken(refreshToken: string): Promise<RefreshResponse> {
-  return postJson<RefreshResponse>('/api/auth/refresh', { refreshToken });
+/**
+ * No body: the browser attaches the httpOnly cookie, which our JavaScript can't even read.
+ * 200 gives a new access token plus the user; 401 means there is no valid session.
+ */
+export function refreshSession(signal?: AbortSignal): Promise<AuthResponse> {
+  return postJson<AuthResponse>('/api/auth/refresh', undefined, signal);
 }
 
-/** Tells the backend to stop accepting this refresh token. Answers 204 with no body. */
-export function logout(refreshToken: string): Promise<void> {
-  return postJson<void>('/api/auth/logout', { refreshToken });
+/** The backend revokes the session and clears the cookie. Answers 204 with no body. */
+export function logout(): Promise<void> {
+  return postJson<void>('/api/auth/logout');
 }
 
 /** The ONLY call that sends the access token: /me has to know who is asking. */

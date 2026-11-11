@@ -51,7 +51,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       // Local development: /api/* is forwarded to the Spring Boot backend, so the browser sees one origin.
-      // In production VITE_API_URL points the app at the deployed backend instead.
+      // In production the rewrite in vercel.json does the same job, so the app only ever uses /api paths.
       proxy: {
         '/api': {
           target: 'http://localhost:8080',

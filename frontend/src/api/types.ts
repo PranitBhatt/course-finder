@@ -55,19 +55,15 @@ export interface User {
   createdAt: string;
 }
 
-/** Body of a successful POST /api/auth/login or /api/auth/register. */
+/**
+ * Body of a successful POST /api/auth/login, /register or /refresh (all three look the same).
+ * There's no refresh token in here: it arrives as an httpOnly cookie that JavaScript can't read.
+ */
 export interface AuthResponse {
   accessToken: string;
-  refreshToken: string;
   /** Lifetime of the access token, as sent by the backend. Not used by the app yet. */
   expiresIn: number;
   user: User;
-}
-
-/** Body of a successful POST /api/auth/refresh. Note: no new refresh token comes back. */
-export interface RefreshResponse {
-  accessToken: string;
-  expiresIn: number;
 }
 
 /** RFC 7807 body returned by the backend for errors. */

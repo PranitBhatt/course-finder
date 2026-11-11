@@ -48,7 +48,7 @@ function AccountLinks() {
   }
 
   async function handleSignOut() {
-    // Wait for logout: it calls the backend first, then clears the tokens.
+    // Wait for logout: it asks the backend to clear the cookie first, then forgets the user.
     await logout();
     navigate('/');
   }
