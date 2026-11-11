@@ -1,4 +1,9 @@
 app:
+  features:
+    auth:
+      # Auth is still a work in progress, so it's only on locally for now.
+      enabled: true
+
   admin:
     # Fixed token for local development only. Prod reads ADMIN_TOKEN from the environment.
     token: ${ADMIN_TOKEN:dev-admin-token}

@@ -49,6 +49,12 @@ management:
       show-details: never
 
 app:
+  features:
+    auth:
+      # Off by default so prod (Render) never exposes unfinished auth endpoints.
+      # When false, /api/auth/** does not exist at all (404). Turned on in application-dev.yml.
+      enabled: false
+
   cors:
     # Comma-separated list, e.g. https://mydomain.me,https://myapp.vercel.app
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}

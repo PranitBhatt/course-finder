@@ -46,6 +46,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.CONFLICT, "Sync already running", e.getMessage());
     }
 
+    @ExceptionHandler(EmailAlreadyRegisteredException.class)
+    public ProblemDetail handleEmailAlreadyRegistered(EmailAlreadyRegisteredException e) {
+        return problem(HttpStatus.CONFLICT, "Email already registered", e.getMessage());
+    }
+
     @ExceptionHandler(UnsupportedSyncException.class)
     public ProblemDetail handleUnsupportedSync(UnsupportedSyncException e) {
         return problem(HttpStatus.BAD_REQUEST, "Sync not supported", e.getMessage());
