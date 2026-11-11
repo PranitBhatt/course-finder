@@ -47,8 +47,9 @@ function AccountLinks() {
     );
   }
 
-  function handleSignOut() {
-    logout();
+  async function handleSignOut() {
+    // Wait for logout: it calls the backend first, then clears the tokens.
+    await logout();
     navigate('/');
   }
 

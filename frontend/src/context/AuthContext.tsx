@@ -1,5 +1,11 @@
 import { createContext, useEffect, useState, type ReactNode } from 'react';
-import { fetchMe, login as loginRequest, register as registerRequest } from '../api/client';
+import {
+  fetchMe,
+  login as loginRequest,
+  logout as logoutRequest,
+  register as registerRequest,
+} from '../api/client';
+import { clearTokens, getRefreshToken, removeOldToken, saveTokens } from '../api/tokenStorage';
 import type { User } from '../api/types';
 
 /**
@@ -9,49 +15,54 @@ import type { User } from '../api/types';
  */
 export const AUTH_ENABLED = import.meta.env.VITE_AUTH_ENABLED === 'true';
 
-// The single place we keep the token. Every read/write of it goes through this key.
-const TOKEN_KEY = 'courseFinder.token';
-
 export interface AuthContextValue {
   user: User | null;
-  /** True only while we check a saved token with /me on app start. */
+  /** True only while we check the saved tokens with /me on app start. */
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, displayName: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
 
-function readSavedToken(): string | null {
-  if (!AUTH_ENABLED) return null;
-  return localStorage.getItem(TOKEN_KEY);
+/**
+ * The refresh token is what keeps a session alive: even if the access token has expired,
+ * we can still get a new one. So "is there a saved session?" = "is there a refresh token?".
+ */
+function hasSavedSession(): boolean {
+  if (!AUTH_ENABLED) return false;
+  return getRefreshToken() !== null;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  // If there's a saved token we don't know yet who it belongs to, so we start in "loading".
-  // With no token there's nothing to check, so we already know the visitor is a guest.
-  const [loading, setLoading] = useState(() => readSavedToken() !== null);
+  // If there's a saved session we don't know yet who it belongs to, so we start in "loading".
+  // With no session there's nothing to check, so we already know the visitor is a guest.
+  const [loading, setLoading] = useState(hasSavedSession);
 
   useEffect(() => {
-    const token = readSavedToken();
-    if (!token) return;
+    if (!AUTH_ENABLED) return;
+    // Clean up the token from the old single-token setup. Users who had one simply sign in again.
+    removeOldToken();
+
+    if (!hasSavedSession()) return;
 
     // AbortController lets us cancel the request if this effect is cleaned up
     // (React StrictMode runs effects twice in development).
     const controller = new AbortController();
 
-    fetchMe(token, controller.signal)
+    // fetchMe refreshes the access token by itself if it has expired.
+    fetchMe(controller.signal)
       .then((me) => {
         setUser(me);
         setLoading(false);
       })
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === 'AbortError') return;
-        // The token is expired, invalid, or the request failed. Throw it away so we
-        // don't keep sending a bad token, and treat the visitor as a guest.
-        localStorage.removeItem(TOKEN_KEY);
+        // Even a refresh couldn't fix it (or the request failed). Throw the tokens away so
+        // we don't keep sending bad ones, and treat the visitor as a guest.
+        clearTokens();
         setUser(null);
         setLoading(false);
       });
@@ -61,21 +72,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function login(email: string, password: string) {
     const response = await loginRequest(email, password);
-    localStorage.setItem(TOKEN_KEY, response.token);
+    saveTokens(response.accessToken, response.refreshToken);
     setUser(response.user);
   }
 
   async function register(email: string, password: string, displayName: string) {
     const response = await registerRequest(email, password, displayName);
-    localStorage.setItem(TOKEN_KEY, response.token);
+    saveTokens(response.accessToken, response.refreshToken);
     setUser(response.user);
   }
 
-  function logout() {
-    // There is no server call here: the token simply stops being sent. See the
-    // "known weaknesses" — the token itself is still valid until it expires.
-    localStorage.removeItem(TOKEN_KEY);
-    setUser(null);
+  async function logout() {
+    const refreshToken = getRefreshToken();
+    try {
+      // Ask the backend to revoke the refresh token, so a stolen copy stops working.
+      if (refreshToken) await logoutRequest(refreshToken);
+    } catch {
+      // Server down or token already invalid: not a reason to keep the user signed in.
+    } finally {
+      // Always clear locally, whatever the server said. Signing out must never "fail".
+      clearTokens();
+      setUser(null);
+    }
   }
 
   return (

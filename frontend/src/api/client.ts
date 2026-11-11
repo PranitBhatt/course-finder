@@ -1,4 +1,13 @@
-import type { AuthResponse, CourseSearchResponse, ProblemDetail, SearchParams, SourceInfo, User } from './types';
+import { clearTokens, getAccessToken, getRefreshToken, saveAccessToken } from './tokenStorage';
+import type {
+  AuthResponse,
+  CourseSearchResponse,
+  ProblemDetail,
+  RefreshResponse,
+  SearchParams,
+  SourceInfo,
+  User,
+} from './types';
 
 export const PAGE_SIZE = 12;
 
@@ -31,9 +40,11 @@ export class ApiError extends Error {
   }
 }
 
+const SESSION_EXPIRED_MESSAGE = 'Your session has expired. Please sign in again.';
+
 /**
  * `token` is optional on purpose: only callers that really need to say who the user is
- * (right now just fetchMe) pass it. Every other call goes out without an Authorization header.
+ * (via getJsonWithAuth) pass it. Every other call goes out without an Authorization header.
  */
 async function getJson<T>(path: string, signal?: AbortSignal, token?: string): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json' };
@@ -41,7 +52,41 @@ async function getJson<T>(path: string, signal?: AbortSignal, token?: string): P
   return sendRequest<T>(path, { signal, headers });
 }
 
-/** POST a JSON body. Used for login and register, which don't need a token (that's how you get one). */
+/**
+ * GET for endpoints that need a logged-in user.
+ * Access tokens are short-lived, so a 401 usually just means "your access token expired".
+ * Instead of logging the user out, we trade the refresh token for a new access token
+ * and try the call ONE more time. Only once, so a broken token can't cause an endless loop.
+ */
+async function getJsonWithAuth<T>(path: string, signal?: AbortSignal): Promise<T> {
+  try {
+    return await getJson<T>(path, signal, getAccessToken() ?? undefined);
+  } catch (error) {
+    // Anything other than a 401 (server down, rate limit, ...) isn't a token problem.
+    if (!(error instanceof ApiError) || error.status !== 401) throw error;
+  }
+
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) {
+    clearTokens();
+    throw new ApiError(SESSION_EXPIRED_MESSAGE, 401);
+  }
+
+  try {
+    const refreshed = await refreshAccessToken(refreshToken);
+    saveAccessToken(refreshed.accessToken);
+  } catch {
+    // The refresh token is expired, revoked, or the call failed: the session is over.
+    // Clearing the tokens is the "log out locally" part; the caller resets the user.
+    clearTokens();
+    throw new ApiError(SESSION_EXPIRED_MESSAGE, 401);
+  }
+
+  // The retry. If this fails too (even with a 401), the error just goes to the caller.
+  return getJson<T>(path, signal, getAccessToken() ?? undefined);
+}
+
+/** POST a JSON body. Login, register, refresh and logout all send their data this way, without an access token. */
 async function postJson<T>(path: string, body: unknown): Promise<T> {
   return sendRequest<T>(path, {
     method: 'POST',
@@ -68,6 +113,8 @@ async function sendRequest<T>(path: string, init: RequestInit): Promise<T> {
     }
     throw new ApiError(await readProblemMessage(response), response.status);
   }
+  // 204 No Content (e.g. /auth/logout) has no body, so there is nothing to parse.
+  if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }
 
@@ -105,7 +152,17 @@ export function register(email: string, password: string, displayName: string): 
   return postJson<AuthResponse>('/api/auth/register', { email, password, displayName });
 }
 
-/** The ONLY call that sends the token: /me has to know who is asking. */
-export function fetchMe(token: string, signal?: AbortSignal): Promise<User> {
-  return getJson<User>('/api/me', signal, token);
+/** The refresh token goes in the body, never in the Authorization header. */
+export function refreshAccessToken(refreshToken: string): Promise<RefreshResponse> {
+  return postJson<RefreshResponse>('/api/auth/refresh', { refreshToken });
+}
+
+/** Tells the backend to stop accepting this refresh token. Answers 204 with no body. */
+export function logout(refreshToken: string): Promise<void> {
+  return postJson<void>('/api/auth/logout', { refreshToken });
+}
+
+/** The ONLY call that sends the access token: /me has to know who is asking. */
+export function fetchMe(signal?: AbortSignal): Promise<User> {
+  return getJsonWithAuth<User>('/api/me', signal);
 }
