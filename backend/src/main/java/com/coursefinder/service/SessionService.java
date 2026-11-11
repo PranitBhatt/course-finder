@@ -36,6 +36,7 @@ public class SessionService {
     private final UserSessionRepository sessionRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final Duration refreshTokenLifetime;
+    private final Duration reuseGracePeriod;
     private final Duration sessionAbsoluteLifetime;
 
     public SessionService(UserSessionRepository sessionRepository,
@@ -45,6 +46,7 @@ public class SessionService {
         this.sessionRepository = sessionRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.refreshTokenLifetime = refreshTokenProperties.expiration();
+        this.reuseGracePeriod = refreshTokenProperties.reuseGracePeriod();
         this.sessionAbsoluteLifetime = sessionProperties.absoluteLifetime();
     }
 
@@ -78,7 +80,9 @@ public class SessionService {
     public IssuedTokens refresh(String rawToken) {
         Instant now = Instant.now();
 
-        RefreshToken token = refreshTokenRepository.findByTokenHash(TokenHasher.hash(rawToken))
+        // Locks the token row until this transaction ends, so two refreshes with the same token
+        // can't both get past the "already used?" check below. See findByTokenHashForUpdate.
+        RefreshToken token = refreshTokenRepository.findByTokenHashForUpdate(TokenHasher.hash(rawToken))
                 .orElseThrow(InvalidRefreshTokenException::new);
         if (token.isExpired(now)) {
             throw new InvalidRefreshTokenException();
@@ -91,6 +95,20 @@ public class SessionService {
         }
 
         if (token.isUsed()) {
+            // Grace window: a used token coming back within a few seconds is almost always our own
+            // frontend - two tabs, or a retried request, that sent the same cookie at the same time.
+            // The other request already got the new token, so this one just fails (401) and the
+            // session stays alive.
+            //
+            // The trade-off: if a thief uses a stolen token first and the real user's copy arrives
+            // within the window, that reuse is not detected - the real user gets a 401 and the thief
+            // keeps the session until the next reuse is caught. A short window keeps that gap small;
+            // a reuse after the window is treated as theft, exactly as before.
+            if (token.getUsedAt().plus(reuseGracePeriod).isAfter(now)) {
+                log.info("Refresh token reused within the grace period - session {} not revoked", session.getId());
+                throw new InvalidRefreshTokenException();
+            }
+
             session.revoke(SessionRevokeReason.REUSE_DETECTED, now);
             // Ids only: logging the token would hand it to anyone who can read the logs.
             log.warn("Refresh token reuse detected - revoked session {} of user {}",

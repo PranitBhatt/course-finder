@@ -77,6 +77,9 @@ app:
     cleanup-cron: "0 30 4 * * *"
     # The refresh token cookie is HTTPS-only. Turned off in application-dev.yml for http://localhost.
     cookie-secure: true
+    # A used token coming back within this time is treated as two tabs refreshing at once (401, session
+    # kept), not as theft (session revoked). Longer = fewer false alarms, but a bigger blind spot.
+    reuse-grace-period: 10s
 
   session:
     # A login lasts at most this long, however often it is refreshed. Then the user logs in again.

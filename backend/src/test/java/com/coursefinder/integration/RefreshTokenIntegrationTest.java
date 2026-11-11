@@ -21,7 +21,14 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.allOf;
@@ -126,6 +133,8 @@ class RefreshTokenIntegrationTest {
         Cookie stolenCopy = register();
         // The real user refreshes; their cookie now holds the new token.
         Cookie usersNewToken = refreshAndGetNewCookie(stolenCopy);
+        // Move past the grace window: pretend the old token was used a minute ago.
+        jdbcTemplate.update("UPDATE refresh_token SET used_at = now() - interval '1 minute' WHERE used_at IS NOT NULL");
 
         // The attacker replays the old (already used) token.
         refresh(stolenCopy, FRONTEND_ORIGIN).andExpect(status().isUnauthorized());
@@ -134,6 +143,56 @@ class RefreshTokenIntegrationTest {
         refresh(usersNewToken, FRONTEND_ORIGIN).andExpect(status().isUnauthorized());
         assertThat(jdbcTemplate.queryForObject("SELECT revoke_reason FROM user_session", String.class))
                 .isEqualTo("REUSE_DETECTED");
+    }
+
+    @Test
+    void reuseInsideTheGraceWindowDoesNotRevokeTheSession() throws Exception {
+        Cookie oldToken = register();
+        Cookie newToken = refreshAndGetNewCookie(oldToken);
+
+        // The old token again, right away - like a second tab whose request arrived a moment later.
+        refresh(oldToken, FRONTEND_ORIGIN).andExpect(status().isUnauthorized());
+
+        // Treated as a harmless race: the session is still alive and the new token still works.
+        assertThat(jdbcTemplate.queryForObject("SELECT revoked_at IS NULL FROM user_session", Boolean.class)).isTrue();
+        refresh(newToken, FRONTEND_ORIGIN).andExpect(status().isOk());
+    }
+
+    @Test
+    void parallelRefreshesWithTheSameTokenLetExactlyOneWin() throws Exception {
+        register();
+
+        // Several rounds, each with a fresh session, to give the two requests a real chance to overlap.
+        // Whatever the timing, the result must be the same: one 200, one 401, one new token.
+        for (int round = 0; round < 5; round++) {
+            Cookie sharedToken = loginAndGetCookie();
+            CountDownLatch startSignal = new CountDownLatch(1);
+            ExecutorService threads = Executors.newFixedThreadPool(2);
+            try {
+                List<Future<Integer>> statuses = new ArrayList<>();
+                for (int i = 0; i < 2; i++) {
+                    statuses.add(threads.submit(() -> {
+                        startSignal.await(); // both threads wait here...
+                        return refresh(sharedToken, FRONTEND_ORIGIN).andReturn().getResponse().getStatus();
+                    }));
+                }
+                startSignal.countDown(); // ...and are released at the same moment
+
+                assertThat(List.of(statuses.get(0).get(10, TimeUnit.SECONDS), statuses.get(1).get(10, TimeUnit.SECONDS)))
+                        .containsExactlyInAnyOrder(200, 401);
+            } finally {
+                threads.shutdown();
+            }
+        }
+
+        // The loser fell inside the grace window, so no session was revoked...
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM user_session WHERE revoked_at IS NOT NULL", Integer.class)).isZero();
+        // ...and every session (1 from register + 5 logins) has exactly one usable token, not two.
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT count(*) FROM refresh_token WHERE used_at IS NULL GROUP BY session_id", Integer.class))
+                .hasSize(6)
+                .containsOnly(1);
     }
 
     @Test
@@ -249,6 +308,13 @@ class RefreshTokenIntegrationTest {
         Cookie newCookie = result.getResponse().getCookie(RefreshTokenCookies.NAME);
         assertThat(newCookie).isNotNull();
         return newCookie;
+    }
+
+    /** Logs Ada in (a new session) and returns its refresh token cookie. */
+    private Cookie loginAndGetCookie() throws Exception {
+        Cookie cookie = login().andExpect(status().isOk()).andReturn().getResponse().getCookie(RefreshTokenCookies.NAME);
+        assertThat(cookie).isNotNull();
+        return cookie;
     }
 
     private ResultActions login() throws Exception {
