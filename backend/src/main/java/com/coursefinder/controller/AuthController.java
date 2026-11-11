@@ -8,8 +8,10 @@ import com.coursefinder.dto.response.UserDto;
 import com.coursefinder.exception.InvalidRefreshTokenException;
 import com.coursefinder.security.JwtService;
 import com.coursefinder.security.RefreshTokenCookies;
-import com.coursefinder.service.RefreshTokenService;
+import com.coursefinder.service.SessionService;
+import com.coursefinder.service.SessionService.IssuedTokens;
 import com.coursefinder.service.UserService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
@@ -40,35 +42,37 @@ public class AuthController {
 
     private final UserService userService;
     private final JwtService jwtService;
-    private final RefreshTokenService refreshTokenService;
+    private final SessionService sessionService;
     private final RefreshTokenCookies refreshTokenCookies;
 
     public AuthController(UserService userService, JwtService jwtService,
-                          RefreshTokenService refreshTokenService, RefreshTokenCookies refreshTokenCookies) {
+                          SessionService sessionService, RefreshTokenCookies refreshTokenCookies) {
         this.userService = userService;
         this.jwtService = jwtService;
-        this.refreshTokenService = refreshTokenService;
+        this.sessionService = sessionService;
         this.refreshTokenCookies = refreshTokenCookies;
     }
 
     /** {@code POST /api/auth/register} - creates an account and logs it in, 409 if the email is taken. */
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request,
+                                                 HttpServletRequest httpRequest) {
         UserDto user = userService.register(request);
         // Log the user in right away so they don't have to log in again after signing up.
-        return issueTokens(HttpStatus.CREATED, user);
+        return startSession(HttpStatus.CREATED, user, httpRequest);
     }
 
     /** {@code POST /api/auth/login} - 200 with tokens if the email and password match, otherwise 401. */
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request,
+                                              HttpServletRequest httpRequest) {
         UserDto user = userService.login(request);
-        return issueTokens(HttpStatus.OK, user);
+        return startSession(HttpStatus.OK, user, httpRequest);
     }
 
     /**
-     * {@code POST /api/auth/refresh} - new access token if the refresh token cookie is valid, otherwise 401.
-     * The browser sends the cookie by itself; no request body needed.
+     * {@code POST /api/auth/refresh} - trades the refresh token cookie for a new access token AND
+     * a new refresh token (rotation). The old refresh token can't be used again. 401 if invalid.
      */
     @PostMapping("/refresh")
     public ResponseEntity<AccessTokenResponse> refresh(
@@ -76,20 +80,19 @@ public class AuthController {
         if (refreshToken == null || refreshToken.isBlank()) {
             throw new InvalidRefreshTokenException();
         }
-        Long userId = refreshTokenService.findUserId(refreshToken);
+        IssuedTokens tokens = sessionService.refresh(refreshToken);
 
-        AccessTokenResponse body =
-                new AccessTokenResponse(jwtService.createToken(userId), jwtService.getExpiration().toSeconds());
-        // Same refresh token as before, set again so the cookie's Max-Age starts over.
+        AccessTokenResponse body = new AccessTokenResponse(
+                jwtService.createToken(tokens.userId(), tokens.sessionId()), jwtService.getExpiration().toSeconds());
         return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, refreshTokenCookies.create(refreshToken).toString())
+                .header(HttpHeaders.SET_COOKIE, refreshCookie(tokens))
                 .body(body);
     }
 
     /**
-     * {@code POST /api/auth/logout} - deletes the refresh token and the cookie. Always 204.
+     * {@code POST /api/auth/logout} - ends the session and deletes the cookie. Always 204.
      * <p>
-     * Idempotent: calling it once or five times leaves the same result (the token is gone).
+     * Idempotent: calling it once or five times leaves the same result (the session is over).
      * A retry after a network error, a double click, or two open tabs all logging out
      * shouldn't show an error, because the user got exactly what they asked for.
      * It also doesn't reveal whether a token existed.
@@ -98,20 +101,27 @@ public class AuthController {
     public ResponseEntity<Void> logout(
             @CookieValue(name = RefreshTokenCookies.NAME, required = false) String refreshToken) {
         if (refreshToken != null && !refreshToken.isBlank()) {
-            refreshTokenService.delete(refreshToken);
+            sessionService.logout(refreshToken);
         }
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, refreshTokenCookies.clear().toString())
                 .build();
     }
 
-    private ResponseEntity<AuthResponse> issueTokens(HttpStatus status, UserDto user) {
-        String accessToken = jwtService.createToken(user.id());
-        String refreshToken = refreshTokenService.create(user.id());
+    private ResponseEntity<AuthResponse> startSession(HttpStatus status, UserDto user, HttpServletRequest httpRequest) {
+        // Stored with the session so the user can later see where they're logged in.
+        // getRemoteAddr() is the real client IP on Render thanks to server.forward-headers-strategy.
+        IssuedTokens tokens = sessionService.startSession(
+                user.id(), httpRequest.getHeader(HttpHeaders.USER_AGENT), httpRequest.getRemoteAddr());
 
-        AuthResponse body = new AuthResponse(accessToken, jwtService.getExpiration().toSeconds(), user);
+        AuthResponse body = new AuthResponse(
+                jwtService.createToken(user.id(), tokens.sessionId()), jwtService.getExpiration().toSeconds(), user);
         return ResponseEntity.status(status)
-                .header(HttpHeaders.SET_COOKIE, refreshTokenCookies.create(refreshToken).toString())
+                .header(HttpHeaders.SET_COOKIE, refreshCookie(tokens))
                 .body(body);
+    }
+
+    private String refreshCookie(IssuedTokens tokens) {
+        return refreshTokenCookies.create(tokens.refreshToken(), tokens.refreshTokenLifetime()).toString();
     }
 }

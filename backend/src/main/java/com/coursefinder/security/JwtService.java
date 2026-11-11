@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
+import java.util.UUID;
 
 /**
  * Creates and checks JWT access tokens.
@@ -33,11 +34,13 @@ public class JwtService {
         this.expiration = properties.accessTokenExpiration();
     }
 
-    public String createToken(Long userId) {
+    public String createToken(Long userId, UUID sessionId) {
         Instant now = Instant.now();
         return Jwts.builder()
                 // "sub" (subject) = who the token is about. The id never changes, unlike the email.
                 .subject(String.valueOf(userId))
+                // "sid" = which login session issued it, so a request can be tied to a session.
+                .claim("sid", sessionId.toString())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(expiration)))
                 .signWith(key, Jwts.SIG.HS256)

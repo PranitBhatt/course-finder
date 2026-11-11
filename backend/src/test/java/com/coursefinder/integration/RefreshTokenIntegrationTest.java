@@ -20,6 +20,9 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
@@ -30,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Refresh token cookie, refresh, logout and the Origin check, against a real PostgreSQL
+ * Sessions, rotating refresh token cookies, reuse detection, logout and the Origin check, against a real PostgreSQL
  * with the real Flyway migrations. Skipped automatically when Docker is not available.
  */
 @Testcontainers(disabledWithoutDocker = true)
@@ -95,8 +98,68 @@ class RefreshTokenIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("ada@example.com"));
 
-        // No rotation: the same refresh token keeps working.
-        refresh(refreshCookie, FRONTEND_ORIGIN).andExpect(status().isOk());
+        // The access token says which session it belongs to.
+        String payload = new String(Base64.getUrlDecoder().decode(newAccessToken.split("\\.")[1]), StandardCharsets.UTF_8);
+        String sessionId = jdbcTemplate.queryForObject("SELECT id::text FROM user_session", String.class);
+        assertThat(payload).contains("\"sid\":\"" + sessionId + "\"");
+    }
+
+    @Test
+    void refreshRotatesTheRefreshToken() throws Exception {
+        Cookie first = register();
+
+        Cookie second = refreshAndGetNewCookie(first);
+        Cookie third = refreshAndGetNewCookie(second);
+
+        // Every refresh hands out a different token.
+        assertThat(second.getValue()).isNotEqualTo(first.getValue());
+        assertThat(third.getValue()).isNotEqualTo(second.getValue());
+
+        // All of them belong to the one session created at login, and only the newest is unused.
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM user_session", Integer.class)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM refresh_token WHERE used_at IS NULL", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void replayingAnOldTokenRevokesTheWholeSession() throws Exception {
+        Cookie stolenCopy = register();
+        // The real user refreshes; their cookie now holds the new token.
+        Cookie usersNewToken = refreshAndGetNewCookie(stolenCopy);
+
+        // The attacker replays the old (already used) token.
+        refresh(stolenCopy, FRONTEND_ORIGIN).andExpect(status().isUnauthorized());
+
+        // The whole session is revoked, so even the real user's newest token stops working.
+        refresh(usersNewToken, FRONTEND_ORIGIN).andExpect(status().isUnauthorized());
+        assertThat(jdbcTemplate.queryForObject("SELECT revoke_reason FROM user_session", String.class))
+                .isEqualTo("REUSE_DETECTED");
+    }
+
+    @Test
+    void sessionCannotOutliveItsAbsoluteLifetime() throws Exception {
+        Cookie cookie = register();
+
+        // Login sets the hard limit to 30 days.
+        Integer days = jdbcTemplate.queryForObject(
+                "SELECT round(extract(epoch FROM absolute_expires_at - created_at) / 86400)::int FROM user_session",
+                Integer.class);
+        assertThat(days).isEqualTo(30);
+
+        // Pretend the session is in its last hour: a new token must not be valid longer than the session.
+        jdbcTemplate.update("UPDATE user_session SET absolute_expires_at = now() + interval '1 hour'");
+        MvcResult result = refresh(cookie, FRONTEND_ORIGIN).andExpect(status().isOk()).andReturn();
+        Cookie lastToken = result.getResponse().getCookie(RefreshTokenCookies.NAME);
+        assertThat(lastToken.getMaxAge()).isBetween(1, 3600);
+        Boolean cappedToSession = jdbcTemplate.queryForObject("""
+                SELECT r.expires_at <= s.absolute_expires_at
+                FROM refresh_token r JOIN user_session s ON s.id = r.session_id
+                WHERE r.used_at IS NULL""", Boolean.class);
+        assertThat(cappedToSession).isTrue();
+
+        // Once the 30 days are over, even an unused, unexpired token is refused.
+        jdbcTemplate.update("UPDATE user_session SET absolute_expires_at = now() - interval '1 minute'");
+        refresh(lastToken, FRONTEND_ORIGIN).andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -178,6 +241,14 @@ class RefreshTokenIntegrationTest {
         Cookie cookie = result.getResponse().getCookie(RefreshTokenCookies.NAME);
         assertThat(cookie).isNotNull();
         return cookie;
+    }
+
+    /** Refreshes with the given cookie and returns the new refresh token cookie from the response. */
+    private Cookie refreshAndGetNewCookie(Cookie refreshCookie) throws Exception {
+        MvcResult result = refresh(refreshCookie, FRONTEND_ORIGIN).andExpect(status().isOk()).andReturn();
+        Cookie newCookie = result.getResponse().getCookie(RefreshTokenCookies.NAME);
+        assertThat(newCookie).isNotNull();
+        return newCookie;
     }
 
     private ResultActions login() throws Exception {

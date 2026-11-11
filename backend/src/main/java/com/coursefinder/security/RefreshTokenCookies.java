@@ -26,8 +26,9 @@ public class RefreshTokenCookies {
         this.properties = properties;
     }
 
-    public ResponseCookie create(String rawToken) {
-        return build(rawToken, properties.expiration());
+    /** @param lifetime how long the token is valid; usually 7 days, less near the end of a session */
+    public ResponseCookie create(String rawToken, Duration lifetime) {
+        return build(rawToken, lifetime);
     }
 
     /** Same cookie with an empty value and Max-Age=0, which tells the browser to delete it. */

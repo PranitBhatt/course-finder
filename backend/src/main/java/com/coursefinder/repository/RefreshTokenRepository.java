@@ -13,9 +13,6 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
 
     Optional<RefreshToken> findByTokenHash(String tokenHash);
 
-    // Derived delete: Spring Data loads the matching rows and deletes them. Needs a transaction.
-    void deleteByTokenHash(String tokenHash);
-
     // One DELETE statement instead of loading every expired row first (which a derived
     // deleteBy... would do). Returns how many rows were removed.
     @Modifying
