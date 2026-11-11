@@ -53,7 +53,7 @@ class SecurityIntegrationTest {
 
     @BeforeEach
     void cleanUsers() {
-        jdbcTemplate.execute("TRUNCATE app_user RESTART IDENTITY");
+        jdbcTemplate.execute("TRUNCATE app_user RESTART IDENTITY CASCADE");
     }
 
     @Test
@@ -110,7 +110,7 @@ class SecurityIntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    /** Registers a user, logs in, and returns the token from the login response. */
+    /** Registers a user, logs in, and returns the access token from the login response. */
     private String registerAndLogin(String email) throws Exception {
         mockMvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content("""
                         {"email": "%s", "password": "secret123", "displayName": "Ada"}
@@ -123,6 +123,6 @@ class SecurityIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        return JsonPath.read(loginResponse, "$.token");
+        return JsonPath.read(loginResponse, "$.accessToken");
     }
 }

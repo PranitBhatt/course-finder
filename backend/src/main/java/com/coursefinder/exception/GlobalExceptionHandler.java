@@ -56,6 +56,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.UNAUTHORIZED, "Invalid credentials", e.getMessage());
     }
 
+    @ExceptionHandler(InvalidRefreshTokenException.class)
+    public ProblemDetail handleInvalidRefreshToken(InvalidRefreshTokenException e) {
+        return problem(HttpStatus.UNAUTHORIZED, "Invalid refresh token", e.getMessage());
+    }
+
     @ExceptionHandler(UnsupportedSyncException.class)
     public ProblemDetail handleUnsupportedSync(UnsupportedSyncException e) {
         return problem(HttpStatus.BAD_REQUEST, "Sync not supported", e.getMessage());

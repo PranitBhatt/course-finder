@@ -67,6 +67,11 @@ app:
     # HMAC key for signing access tokens, at least 32 bytes. No default here on purpose:
     # set JWT_SECRET before enabling auth in prod (e.g. output of `openssl rand -base64 48`).
     secret: ${JWT_SECRET:}
+    # Short on purpose: an access token can't be revoked, so a stolen one should stop working soon.
+    access-token-expiration: 15m
+
+  refresh-token:
+    # Stored in the database, so it can be revoked (logout). Used to get new access tokens.
     expiration: 7d
 
   admin:

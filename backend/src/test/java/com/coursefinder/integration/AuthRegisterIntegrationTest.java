@@ -45,14 +45,14 @@ class AuthRegisterIntegrationTest {
 
     @BeforeEach
     void cleanUsers() {
-        jdbcTemplate.execute("TRUNCATE app_user RESTART IDENTITY");
+        jdbcTemplate.execute("TRUNCATE app_user RESTART IDENTITY CASCADE");
     }
 
     @Test
     void registerCreatesUserAndRejectsDuplicateEmail() throws Exception {
         register("ada@example.com", "secret123")
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.token").isString())
+                .andExpect(jsonPath("$.accessToken").isString())
                 .andExpect(jsonPath("$.user.id").isNumber())
                 .andExpect(jsonPath("$.user.email").value("ada@example.com"))
                 .andExpect(jsonPath("$.user.displayName").value("Ada"))
@@ -84,7 +84,7 @@ class AuthRegisterIntegrationTest {
         // Different case than at registration: login normalizes the email too.
         login("ADA@example.com", "secret123")
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").isString())
+                .andExpect(jsonPath("$.accessToken").isString())
                 .andExpect(jsonPath("$.user.email").value("ada@example.com"))
                 .andExpect(jsonPath("$.user.displayName").value("Ada"))
                 .andExpect(jsonPath("$.user.passwordHash").doesNotExist());

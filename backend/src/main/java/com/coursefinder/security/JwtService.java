@@ -30,7 +30,7 @@ public class JwtService {
         // That's on purpose: with auth enabled and JWT_SECRET missing or short, the app fails
         // at startup instead of signing tokens with a guessable key.
         this.key = Keys.hmacShaKeyFor(properties.secret().getBytes(StandardCharsets.UTF_8));
-        this.expiration = properties.expiration();
+        this.expiration = properties.accessTokenExpiration();
     }
 
     public String createToken(Long userId) {
@@ -42,6 +42,11 @@ public class JwtService {
                 .expiration(Date.from(now.plus(expiration)))
                 .signWith(key, Jwts.SIG.HS256)
                 .compact();
+    }
+
+    /** How long a new access token is valid; sent to the client as "expiresIn". */
+    public Duration getExpiration() {
+        return expiration;
     }
 
     /**
