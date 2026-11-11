@@ -74,6 +74,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.FORBIDDEN, "Account disabled", e.getMessage());
     }
 
+    @ExceptionHandler(FeatureNotAvailableException.class)
+    public ProblemDetail handleFeatureNotAvailable(FeatureNotAvailableException e) {
+        return problem(HttpStatus.FORBIDDEN, "Feature not available", e.getMessage());
+    }
+
     @ExceptionHandler(InvalidRefreshTokenException.class)
     public ProblemDetail handleInvalidRefreshToken(InvalidRefreshTokenException e) {
         return problem(HttpStatus.UNAUTHORIZED, "Invalid refresh token", e.getMessage());

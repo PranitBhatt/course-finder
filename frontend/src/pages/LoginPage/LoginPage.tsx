@@ -15,8 +15,12 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // RequireAuth puts the page the user wanted in `state.from`. Fall back to the home page.
-  const from = (location.state as { from?: string } | null)?.from ?? '/';
+  // RequireAuth puts the page the user wanted in `state.from`; "Sign in to track" links pass
+  // ?next= instead, so the user lands back on their search results. Fall back to the home page.
+  const from =
+    (location.state as { from?: string } | null)?.from ??
+    safeNext(new URLSearchParams(location.search).get('next')) ??
+    '/';
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -78,4 +82,15 @@ export function LoginPage() {
       </form>
     </main>
   );
+}
+
+/**
+ * Only same-site paths are allowed. Otherwise a link like /login?next=https://evil.example would
+ * send the user to another site right after they signed in (an "open redirect").
+ * "//evil.example" (and "/\evil.example", which browsers read the same way) are full addresses
+ * too, so they're refused as well.
+ */
+function safeNext(next: string | null): string | null {
+  if (!next || !next.startsWith('/') || next.startsWith('//') || next.startsWith('/\\')) return null;
+  return next;
 }

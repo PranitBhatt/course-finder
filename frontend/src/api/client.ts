@@ -143,3 +143,24 @@ export function refreshSession(): Promise<AuthResponse> {
 export function logout(): Promise<void> {
   return postJson<void>('/api/auth/logout');
 }
+
+/**
+ * Any method, JSON in and out, Bearer token only (no cookies, like getJson). Used through
+ * requestWithAuth in session.ts, which adds the refresh-and-retry-once on a 401.
+ */
+export async function requestJson<T>(
+  method: 'GET' | 'PUT' | 'DELETE',
+  path: string,
+  options: { body?: unknown; signal?: AbortSignal; token?: string } = {},
+): Promise<T> {
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (options.token) headers.Authorization = `Bearer ${options.token}`;
+  if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+  return sendRequest<T>(path, {
+    method,
+    headers,
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    credentials: 'omit',
+    signal: options.signal,
+  });
+}

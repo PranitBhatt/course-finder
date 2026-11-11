@@ -13,6 +13,22 @@
   /* grid items default to min-width: auto, which lets long one-line text widen the column */
   min-width: 0;
   animation: rise 0.55s var(--ease-out-expo) both;
+  /* anchor for .action */
+  position: relative;
+}
+
+/* Extra control (e.g. "Track") floating over the thumbnail's top-right corner. */
+.action {
+  position: absolute;
+  top: calc(var(--space-3) + var(--space-2));
+  right: calc(var(--space-3) + var(--space-2));
+  z-index: 1;
+  transition: transform 0.25s var(--ease-out-expo);
+}
+
+/* follow the card when it lifts on hover */
+.item:hover .action {
+  transform: translateY(-4px);
 }
 
 @keyframes rise {

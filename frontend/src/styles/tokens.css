@@ -57,6 +57,8 @@
   --success-ink: #3ddc97;
   --success-soft: rgba(24, 180, 107, 0.16);
   --danger-ink: #ff7a7a;
+  /* small print (footer): quieter than --ink but still ~5.8:1 on --bg, unlike --faint */
+  --footer-ink: #8d8c93;
 
   --skeleton: #1d1d22;
   --skeleton-shine: #26262c;
@@ -87,6 +89,8 @@
   --success-ink: #128a52;
   --success-soft: rgba(24, 180, 107, 0.12);
   --danger-ink: #d92d2d;
+  /* --mute is only ~4.4:1 on this --bg; small text needs a bit darker to stay above 4.5:1 */
+  --footer-ink: #555b66;
 
   --skeleton: #eef0f4;
   --skeleton-shine: #f6f7fa;

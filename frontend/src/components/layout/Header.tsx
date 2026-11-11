@@ -55,6 +55,9 @@ function AccountLinks() {
 
   return (
     <>
+      <Link to="/learning" className={styles.link}>
+        My Learning
+      </Link>
       <Link to="/account" className={styles.link}>
         {user.displayName}
       </Link>

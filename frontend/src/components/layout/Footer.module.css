@@ -1,0 +1,26 @@
+.footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+  padding-block: var(--space-5) var(--space-6);
+  border-top: 1px solid var(--line);
+  /* 13px is the smallest size used elsewhere for readable text (MonoLabel); colour meets 4.5:1 */
+  color: var(--footer-ink);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.footer p {
+  max-width: 90ch;
+}
+
+.footer a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.footer a:hover {
+  color: var(--ink);
+}

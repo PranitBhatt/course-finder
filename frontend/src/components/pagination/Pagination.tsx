@@ -5,6 +5,8 @@ interface PaginationProps {
   page: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  /** Accessible name of the page list; defaults to the search results wording. */
+  label?: string;
 }
 
 type PageItem = number | 'gap';
@@ -22,14 +24,14 @@ export function pageItems(page: number, totalPages: number): PageItem[] {
   return items;
 }
 
-export function Pagination({ page, totalPages, onPageChange }: PaginationProps) {
+export function Pagination({ page, totalPages, onPageChange, label = 'Search results pages' }: PaginationProps) {
   if (totalPages <= 1) return null;
 
   const isFirst = page === 0;
   const isLast = page >= totalPages - 1;
 
   return (
-    <nav className={styles.pagination} aria-label="Search results pages">
+    <nav className={styles.pagination} aria-label={label}>
       <button
         type="button"
         className={`${styles.button} ${styles.step}`}

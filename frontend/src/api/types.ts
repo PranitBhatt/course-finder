@@ -80,3 +80,57 @@ export interface SearchParams {
   freeOnly: boolean;
   page: number;
 }
+
+// ---- Course progress ("My Learning"), mirrors the Progress* DTOs ----
+
+export type ProgressStatus = 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED';
+
+export interface ProgressItem {
+  /** Public id of the entry; used to remove it, also when the course is gone. */
+  entryId: string;
+  /** null when the course was removed from the catalog */
+  courseId: number | null;
+  /** Snapshot from the last update, always present */
+  courseTitle: string;
+  courseUrl: string;
+  courseSource: CourseSource;
+  courseSourceName: string;
+  /** The live course, null when it no longer exists */
+  course: Course | null;
+  courseAvailable: boolean;
+  status: ProgressStatus;
+  progressPercent: number;
+  notes: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProgressPage {
+  content: ProgressItem[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+export interface ProgressStatusInfo {
+  status: ProgressStatus;
+  progressPercent: number;
+}
+
+export interface ProgressSummary {
+  planned: number;
+  inProgress: number;
+  completed: number;
+  total: number;
+}
+
+export interface ProgressUpdate {
+  status: ProgressStatus;
+  /** Left out = keep the current value */
+  progressPercent?: number;
+  /** Left out = keep; '' = remove */
+  notes?: string;
+}

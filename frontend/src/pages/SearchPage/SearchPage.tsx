@@ -6,6 +6,7 @@ import { ErrorState } from '../../components/feedback/ErrorState';
 import { SlowLoadingNotice } from '../../components/feedback/SlowLoadingNotice';
 import { WelcomeState } from '../../components/feedback/WelcomeState';
 import { Pagination } from '../../components/pagination/Pagination';
+import { TrackControl } from '../../components/progress/TrackControl';
 import { Filters } from '../../components/search/Filters';
 import { ResultsHeader } from '../../components/search/ResultsHeader';
 import { SearchBar } from '../../components/search/SearchBar';
@@ -13,6 +14,7 @@ import { MonoLabel } from '../../components/ui/MonoLabel';
 import { Pill } from '../../components/ui/Pill';
 import { useCourseSearch } from '../../hooks/useCourseSearch';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { useProgressLookup } from '../../hooks/useProgressLookup';
 import { useSearchUrlState } from '../../hooks/useSearchUrlState';
 import { useSources } from '../../hooks/useSources';
 import { formatNumber } from '../../utils/format';
@@ -27,6 +29,9 @@ export function SearchPage() {
   const { state, retry } = useCourseSearch(params);
   const sources = useSources();
   const resultsRef = useRef<HTMLElement>(null);
+  // Runs only once results are shown, so track badges never hold up the search itself.
+  const courseIds = state.status === 'success' ? state.data.content.map((course) => course.id) : [];
+  const progress = useProgressLookup(courseIds);
 
   // ---- search input <-> ?q= ----
   // `draft` is what's in the box; it reaches the URL after a pause in typing.
@@ -127,7 +132,18 @@ export function SearchPage() {
         {state.status === 'success' && state.data.totalElements > 0 && (
           <>
             <ResultsHeader query={params.q} total={state.data.totalElements} fuzzyMatch={state.data.fuzzyMatch} />
-            <CourseGrid courses={state.data.content} />
+            <CourseGrid
+              courses={state.data.content}
+              renderAction={(course) => (
+                <TrackControl
+                  courseTitle={course.title}
+                  info={progress.statuses[course.id]}
+                  loaded={progress.loaded}
+                  error={progress.errors[course.id]}
+                  onChange={(status) => progress.setStatus(course.id, status)}
+                />
+              )}
+            />
             <Pagination page={state.data.page} totalPages={state.data.totalPages} onPageChange={changePage} />
           </>
         )}

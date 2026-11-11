@@ -1,5 +1,5 @@
 import { clearAccessToken, getAccessToken, setAccessToken } from './accessToken';
-import { ApiError, getJson, refreshSession } from './client';
+import { ApiError, getJson, refreshSession, requestJson } from './client';
 import type { AuthResponse, User } from './types';
 
 /*
@@ -129,4 +129,32 @@ async function getJsonWithAuth<T>(path: string, signal?: AbortSignal): Promise<T
 /** The only call that sends the access token: /me has to know who is asking. */
 export function fetchMe(signal?: AbortSignal): Promise<User> {
   return getJsonWithAuth<User>('/api/me', signal);
+}
+
+/**
+ * Same refresh-and-retry-once as getJsonWithAuth, for any method. Retrying a PUT or DELETE is
+ * safe because the progress endpoints are idempotent: running one twice gives the same result.
+ */
+export async function requestWithAuth<T>(
+  method: 'GET' | 'PUT' | 'DELETE',
+  path: string,
+  options: { body?: unknown; signal?: AbortSignal } = {},
+): Promise<T> {
+  const tokenUsed = getAccessToken();
+  try {
+    return await requestJson<T>(method, path, { ...options, token: tokenUsed ?? undefined });
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 401) throw error;
+  }
+
+  if (getAccessToken() === tokenUsed) {
+    try {
+      await refreshOnce();
+    } catch {
+      onSessionExpired?.();
+      throw new ApiError(SESSION_EXPIRED_MESSAGE, 401);
+    }
+  }
+
+  return requestJson<T>(method, path, { ...options, token: getAccessToken() ?? undefined });
 }
