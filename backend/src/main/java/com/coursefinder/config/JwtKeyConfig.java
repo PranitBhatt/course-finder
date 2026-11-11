@@ -18,6 +18,8 @@ import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtAudienceValidator;
+import org.springframework.security.oauth2.jwt.JwtClaimNames;
+import org.springframework.security.oauth2.jwt.JwtClaimValidator;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtIssuerValidator;
@@ -35,6 +37,8 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.RSAPublicKeySpec;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.Locale;
+import java.util.UUID;
 
 /**
  * The RSA key pair for access tokens, and the encoder/decoder built from it.
@@ -89,6 +93,7 @@ public class JwtKeyConfig {
      *   <li>not expired, and not issued in the future (with {@link #CLOCK_SKEW} tolerance)</li>
      *   <li>"iss" is us - stops tokens from some other system that happens to use the same key format</li>
      *   <li>"aud" includes our audience - stops a token meant for another service from being used here</li>
+     *   <li>"sub" is a UUID (a public user id)</li>
      * </ul>
      */
     @Bean
@@ -100,7 +105,10 @@ public class JwtKeyConfig {
         OAuth2TokenValidator<Jwt> validator = new DelegatingOAuth2TokenValidator<>(
                 new JwtTimestampValidator(CLOCK_SKEW),
                 new JwtIssuerValidator(properties.issuer()),
-                new JwtAudienceValidator(properties.audience()));
+                new JwtAudienceValidator(properties.audience()),
+                // "sub" must be a public id (UUID). Older tokens with a numeric sub are refused here
+                // with a clean 401, instead of failing later; the client then refreshes or logs in again.
+                new JwtClaimValidator<String>(JwtClaimNames.SUB, JwtKeyConfig::isUuid));
         decoder.setJwtValidator(validator);
         return decoder;
     }
@@ -138,6 +146,14 @@ public class JwtKeyConfig {
                     .build();
         } catch (GeneralSecurityException | ClassCastException | IllegalArgumentException e) {
             throw new IllegalStateException("JWT_PRIVATE_KEY is not a valid RSA private key in PKCS#8 PEM format", e);
+        }
+    }
+
+    private static boolean isUuid(String value) {
+        try {
+            return value != null && UUID.fromString(value).toString().equals(value.toLowerCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            return false;
         }
     }
 

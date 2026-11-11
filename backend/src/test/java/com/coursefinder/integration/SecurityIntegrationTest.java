@@ -98,11 +98,11 @@ class SecurityIntegrationTest {
         registerAndLogin("ada@example.com");
         String bobsToken = registerAndLogin("bob@example.com");
 
-        // Try to become user 1 by editing the "sub" claim in Bob's token (user 2).
+        // Try to become Ada by putting her public id into the "sub" claim of Bob's token.
         // The payload is only base64, so anyone can change it - but then the signature no longer matches.
         String[] parts = bobsToken.split("\\.");
         String payload = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
-        String forgedPayload = payload.replace("\"sub\":\"2\"", "\"sub\":\"1\"");
+        String forgedPayload = payload.replace(publicIdOf("bob@example.com"), publicIdOf("ada@example.com"));
         assertThat(forgedPayload).isNotEqualTo(payload); // make sure we really changed something
         String forgedToken = parts[0] + "."
                 + Base64.getUrlEncoder().withoutPadding().encodeToString(forgedPayload.getBytes(StandardCharsets.UTF_8))
@@ -131,11 +131,12 @@ class SecurityIntegrationTest {
     void meWithTokenSignedByAnotherKeyReturns401() throws Exception {
         registerAndLogin("ada@example.com");
 
-        // Correct claims for user 1, correct kid - but signed with a key that isn't ours.
+        // Correct claims for Ada, correct kid - but signed with a key that isn't ours.
         RSAKey otherKey = TestJwtKeys.generate(TestJwtKeys.KEY_ID);
         JwtService forger = new JwtService(new NimbusJwtEncoder(new ImmutableJWKSet<>(new JWKSet(otherKey))),
                 otherKey, jwtProperties);
-        String forgedToken = forger.createToken(1L, UUID.randomUUID(), Role.ADMIN);
+        String forgedToken = forger.createToken(
+                UUID.fromString(publicIdOf("ada@example.com")), UUID.randomUUID(), Role.ADMIN);
 
         mockMvc.perform(get("/api/me").header("Authorization", "Bearer " + forgedToken))
                 .andExpect(status().isUnauthorized())
@@ -162,6 +163,10 @@ class SecurityIntegrationTest {
 
         mockMvc.perform(get("/api/admin/stats"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    private String publicIdOf(String email) {
+        return jdbcTemplate.queryForObject("SELECT public_id::text FROM app_user WHERE email = ?", String.class, email);
     }
 
     /** Registers a user, logs in, and returns the access token from the login response. */

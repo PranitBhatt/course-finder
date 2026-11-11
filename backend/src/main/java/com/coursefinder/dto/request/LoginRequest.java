@@ -1,5 +1,6 @@
 package com.coursefinder.dto.request;
 
+import com.coursefinder.util.LogMasking;
 import jakarta.validation.constraints.NotBlank;
 
 /**
@@ -13,4 +14,13 @@ public record LoginRequest(
         @NotBlank(message = "must not be blank")
         String password
 ) {
+
+    /**
+     * A record's default toString prints every field - including the password. Spring prints request
+     * bodies when its debug logging is turned on, so this keeps the password and full email out of logs.
+     */
+    @Override
+    public String toString() {
+        return "LoginRequest[email=%s, password=****]".formatted(LogMasking.maskEmail(email));
+    }
 }

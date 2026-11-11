@@ -2,10 +2,12 @@ package com.coursefinder.service;
 
 import com.coursefinder.config.properties.RefreshTokenProperties;
 import com.coursefinder.config.properties.SessionProperties;
+import com.coursefinder.entity.AppUser;
 import com.coursefinder.entity.RefreshToken;
 import com.coursefinder.entity.SessionRevokeReason;
 import com.coursefinder.entity.UserSession;
 import com.coursefinder.exception.InvalidRefreshTokenException;
+import com.coursefinder.repository.AppUserRepository;
 import com.coursefinder.repository.RefreshTokenRepository;
 import com.coursefinder.repository.UserSessionRepository;
 import com.coursefinder.security.TokenHasher;
@@ -35,16 +37,19 @@ public class SessionService {
 
     private final UserSessionRepository sessionRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final AppUserRepository appUserRepository;
     private final Duration refreshTokenLifetime;
     private final Duration reuseGracePeriod;
     private final Duration sessionAbsoluteLifetime;
 
     public SessionService(UserSessionRepository sessionRepository,
                           RefreshTokenRepository refreshTokenRepository,
+                          AppUserRepository appUserRepository,
                           RefreshTokenProperties refreshTokenProperties,
                           SessionProperties sessionProperties) {
         this.sessionRepository = sessionRepository;
         this.refreshTokenRepository = refreshTokenRepository;
+        this.appUserRepository = appUserRepository;
         this.refreshTokenLifetime = refreshTokenProperties.expiration();
         this.reuseGracePeriod = refreshTokenProperties.reuseGracePeriod();
         this.sessionAbsoluteLifetime = sessionProperties.absoluteLifetime();
@@ -91,6 +96,12 @@ public class SessionService {
         UserSession session = sessionRepository.findById(token.getSessionId())
                 .orElseThrow(InvalidRefreshTokenException::new);
         if (!session.isActive(now)) {
+            throw new InvalidRefreshTokenException();
+        }
+
+        // A disabled user keeps no way back in: no new access tokens, even with a valid refresh token.
+        boolean userActive = appUserRepository.findById(session.getUserId()).map(AppUser::isActive).orElse(false);
+        if (!userActive) {
             throw new InvalidRefreshTokenException();
         }
 

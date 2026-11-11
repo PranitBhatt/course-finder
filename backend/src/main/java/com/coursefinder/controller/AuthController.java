@@ -11,6 +11,7 @@ import com.coursefinder.security.RefreshTokenCookies;
 import com.coursefinder.service.SessionService;
 import com.coursefinder.service.SessionService.IssuedTokens;
 import com.coursefinder.service.UserService;
+import com.coursefinder.service.UserService.AuthenticatedUser;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -57,7 +58,7 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request,
                                                  HttpServletRequest httpRequest) {
-        UserDto user = userService.register(request);
+        AuthenticatedUser user = userService.register(request);
         // Log the user in right away so they don't have to log in again after signing up.
         return startSession(HttpStatus.CREATED, user, httpRequest);
     }
@@ -66,7 +67,7 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request,
                                               HttpServletRequest httpRequest) {
-        UserDto user = userService.login(request);
+        AuthenticatedUser user = userService.login(request);
         return startSession(HttpStatus.OK, user, httpRequest);
     }
 
@@ -110,11 +111,13 @@ public class AuthController {
                 .build();
     }
 
-    private ResponseEntity<AuthResponse> startSession(HttpStatus status, UserDto user, HttpServletRequest httpRequest) {
+    private ResponseEntity<AuthResponse> startSession(HttpStatus status, AuthenticatedUser authenticated,
+                                                      HttpServletRequest httpRequest) {
+        UserDto user = authenticated.user();
         // Stored with the session so the user can later see where they're logged in.
         // getRemoteAddr() is the real client IP on Render thanks to server.forward-headers-strategy.
         IssuedTokens tokens = sessionService.startSession(
-                user.id(), httpRequest.getHeader(HttpHeaders.USER_AGENT), httpRequest.getRemoteAddr());
+                authenticated.internalId(), httpRequest.getHeader(HttpHeaders.USER_AGENT), httpRequest.getRemoteAddr());
 
         AuthResponse body = new AuthResponse(
                 jwtService.createToken(user.id(), tokens.sessionId(), user.role()), jwtService.getExpiration().toSeconds(), user);

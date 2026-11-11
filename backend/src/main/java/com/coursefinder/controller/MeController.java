@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.UUID;
+
 /** The logged-in user's own data. Needs a valid Bearer token (see SecurityConfig). */
 @RestController
 @RequestMapping("/api/me")
@@ -28,6 +30,7 @@ public class MeController {
      */
     @GetMapping
     public UserDto me(@AuthenticationPrincipal Jwt jwt) {
-        return userService.getById(Long.valueOf(jwt.getSubject()));
+        // "sub" is the public id; the decoder already made sure it's a valid UUID.
+        return userService.getByPublicId(UUID.fromString(jwt.getSubject()));
     }
 }

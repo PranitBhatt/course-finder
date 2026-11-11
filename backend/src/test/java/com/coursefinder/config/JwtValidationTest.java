@@ -38,6 +38,7 @@ class JwtValidationTest {
     private static final String ISSUER = "course-finder-api";
     private static final String AUDIENCE = "course-finder-web";
     private static final RSAKey KEY = TestJwtKeys.SIGNING_KEY;
+    private static final UUID USER_ID = UUID.randomUUID();
 
     private final JwtProperties properties = new JwtProperties(
             null, TestJwtKeys.KEY_ID, ISSUER, AUDIENCE, Duration.ofMinutes(15), false);
@@ -57,10 +58,10 @@ class JwtValidationTest {
         JwtService jwtService = new JwtService(config.jwtEncoder(KEY), KEY, properties);
         UUID sessionId = UUID.randomUUID();
 
-        Jwt jwt = decoder.decode(jwtService.createToken(7L, sessionId, Role.USER));
+        Jwt jwt = decoder.decode(jwtService.createToken(USER_ID, sessionId, Role.USER));
 
         assertThat(jwt.getHeaders()).containsEntry("alg", "RS256").containsEntry("kid", TestJwtKeys.KEY_ID);
-        assertThat(jwt.getSubject()).isEqualTo("7");
+        assertThat(jwt.getSubject()).isEqualTo(USER_ID.toString());
         // getIssuer() would try to turn it into a URL; ours is a plain name.
         assertThat(jwt.getClaimAsString("iss")).isEqualTo(ISSUER);
         assertThat(jwt.getAudience()).containsExactly(AUDIENCE);
@@ -95,7 +96,7 @@ class JwtValidationTest {
         // 10 seconds over is inside the 30 second tolerance for clocks that are slightly off.
         Instant now = Instant.now();
         String token = sign(KEY, claims -> claims.issuedAt(now.minusSeconds(900)).expiresAt(now.minusSeconds(10)));
-        assertThat(decoder.decode(token).getSubject()).isEqualTo("7");
+        assertThat(decoder.decode(token).getSubject()).isEqualTo(USER_ID.toString());
     }
 
     @Test
@@ -103,7 +104,7 @@ class JwtValidationTest {
         String[] parts = sign(KEY, claims -> { }).split("\\.");
         String payload = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
         String forged = Base64.getUrlEncoder().withoutPadding()
-                .encodeToString(payload.replace("\"sub\":\"7\"", "\"sub\":\"1\"").getBytes(StandardCharsets.UTF_8));
+                .encodeToString(payload.replace(USER_ID.toString(), UUID.randomUUID().toString()).getBytes(StandardCharsets.UTF_8));
         assertThat(forged).isNotEqualTo(parts[1]); // make sure we really changed something
 
         String tampered = parts[0] + "." + forged + "." + parts[2];
@@ -115,6 +116,14 @@ class JwtValidationTest {
         // Same kid, same claims, but signed by a key that isn't ours.
         RSAKey attackersKey = TestJwtKeys.generate(TestJwtKeys.KEY_ID);
         String token = sign(attackersKey, claims -> { });
+        assertThatThrownBy(() -> decoder.decode(token)).isInstanceOf(JwtException.class);
+    }
+
+    @Test
+    void numericSubjectFromBeforePublicIdsIsRejected() {
+        // Correctly signed, not expired - but "sub" is an old numeric id. Refused with a clean 401
+        // instead of failing later; the client refreshes and gets a token with the public id.
+        String token = sign(KEY, claims -> claims.subject("7"));
         assertThatThrownBy(() -> decoder.decode(token)).isInstanceOf(JwtException.class);
     }
 
@@ -162,7 +171,7 @@ class JwtValidationTest {
         JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
                 .issuer(ISSUER)
                 .audience(List.of(AUDIENCE))
-                .subject("7")
+                .subject(USER_ID.toString())
                 .issuedAt(now)
                 .expiresAt(now.plusSeconds(900));
         changes.accept(claims);

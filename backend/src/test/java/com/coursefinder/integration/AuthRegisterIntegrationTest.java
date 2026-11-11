@@ -17,6 +17,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -61,7 +62,8 @@ class AuthRegisterIntegrationTest {
         register("ada@example.com", "secret123")
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.accessToken").isString())
-                .andExpect(jsonPath("$.user.id").isNumber())
+                // The public id (a UUID string), never the internal numeric id.
+                .andExpect(jsonPath("$.user.id").value(matchesPattern("[0-9a-f-]{36}")))
                 .andExpect(jsonPath("$.user.email").value("ada@example.com"))
                 .andExpect(jsonPath("$.user.displayName").value("Ada"))
                 .andExpect(jsonPath("$.user.createdAt").exists())

@@ -56,6 +56,24 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.UNAUTHORIZED, "Invalid credentials", e.getMessage());
     }
 
+    /**
+     * 429 + Retry-After (in seconds), the standard way to say "slow down, come back then".
+     * Clients and tools understand it without reading our message.
+     */
+    @ExceptionHandler(AccountLockedException.class)
+    public ResponseEntity<ProblemDetail> handleAccountLocked(AccountLockedException e) {
+        // Round up, so a client that waits exactly this long is never a second too early.
+        long seconds = Math.max(1, (e.getRetryAfter().toMillis() + 999) / 1000);
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(seconds))
+                .body(problem(HttpStatus.TOO_MANY_REQUESTS, "Account temporarily locked", e.getMessage()));
+    }
+
+    @ExceptionHandler(AccountDisabledException.class)
+    public ProblemDetail handleAccountDisabled(AccountDisabledException e) {
+        return problem(HttpStatus.FORBIDDEN, "Account disabled", e.getMessage());
+    }
+
     @ExceptionHandler(InvalidRefreshTokenException.class)
     public ProblemDetail handleInvalidRefreshToken(InvalidRefreshTokenException e) {
         return problem(HttpStatus.UNAUTHORIZED, "Invalid refresh token", e.getMessage());

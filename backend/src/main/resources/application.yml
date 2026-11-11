@@ -88,6 +88,14 @@ app:
     # kept), not as theft (session revoked). Longer = fewer false alarms, but a bigger blind spot.
     reuse-grace-period: 10s
 
+  login:
+    # After this many wrong passwords in a row the account is locked (429 with Retry-After).
+    max-failed-attempts: 5
+    # Temporary on purpose: a permanent lock would let anyone lock out any user just by typing
+    # wrong passwords for their email. 15 minutes makes guessing useless (5 tries per 15 min)
+    # while the real user is only briefly inconvenienced.
+    lock-duration: 15m
+
   session:
     # A login lasts at most this long, however often it is refreshed. Then the user logs in again.
     absolute-lifetime: 30d

@@ -36,7 +36,7 @@ public class JwtService {
         this.keyId = jwtSigningKey.getKeyID();
     }
 
-    public String createToken(Long userId, UUID sessionId, Role role) {
+    public String createToken(UUID userPublicId, UUID sessionId, Role role) {
         Instant now = Instant.now();
 
         // "kid" (key id) tells the verifier which key signed this token. That makes it possible to
@@ -47,8 +47,9 @@ public class JwtService {
                 // "iss" = who made the token, "aud" = who it's for. Both are checked when it comes back.
                 .issuer(properties.issuer())
                 .audience(List.of(properties.audience()))
-                // "sub" (subject) = who the token is about. The id never changes, unlike the email.
-                .subject(String.valueOf(userId))
+                // "sub" (subject) = who the token is about: the user's PUBLIC id. Never the numeric
+                // database id - tokens are readable by anyone, and a counter leaks how many users exist.
+                .subject(userPublicId.toString())
                 .issuedAt(now)
                 .expiresAt(now.plus(properties.accessTokenExpiration()))
                 // "jti" = a unique id for this one token, so a specific token can be told apart
