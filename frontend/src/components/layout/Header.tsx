@@ -1,4 +1,6 @@
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
+import { AUTH_ENABLED } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import type { Theme } from '../../hooks/useTheme';
 import { ThemeToggle } from '../ui/ThemeToggle';
 import styles from './Header.module.css';
@@ -20,7 +22,44 @@ export function Header({ theme, onToggleTheme }: HeaderProps) {
         </span>
         <span className={styles.name}>Course Finder</span>
       </Link>
-      <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+      <div className={styles.actions}>
+        {AUTH_ENABLED && <AccountLinks />}
+        <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+      </div>
     </header>
+  );
+}
+
+/** "Sign in" for guests, name + "Sign out" for logged-in users. Only rendered when auth is enabled. */
+function AccountLinks() {
+  const { user, loading, logout } = useAuth();
+  const navigate = useNavigate();
+
+  // While a saved token is being checked we don't know yet, so show nothing rather than
+  // flashing "Sign in" at someone who is actually logged in.
+  if (loading) return null;
+
+  if (!user) {
+    return (
+      <Link to="/login" className={styles.link}>
+        Sign in
+      </Link>
+    );
+  }
+
+  function handleSignOut() {
+    logout();
+    navigate('/');
+  }
+
+  return (
+    <>
+      <Link to="/account" className={styles.link}>
+        {user.displayName}
+      </Link>
+      <button type="button" className={styles.signOut} onClick={handleSignOut}>
+        Sign out
+      </button>
+    </>
   );
 }

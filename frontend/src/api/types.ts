@@ -46,6 +46,21 @@ export interface SourceInfo {
   lastSyncFinishedAt: string | null;
 }
 
+/** The logged-in user, as returned by /api/me and inside the login/register response. */
+export interface User {
+  // The contract doesn't say if this is a number or a UUID string; we only display it, so allow both.
+  id: number | string;
+  email: string;
+  displayName: string;
+  createdAt: string;
+}
+
+/** Body of a successful POST /api/auth/login or /api/auth/register. */
+export interface AuthResponse {
+  token: string;
+  user: User;
+}
+
 /** RFC 7807 body returned by the backend for errors. */
 export interface ProblemDetail {
   status: number;

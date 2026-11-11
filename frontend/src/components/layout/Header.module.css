@@ -30,3 +30,36 @@
   font-size: 20px;
   letter-spacing: -0.02em;
 }
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.link {
+  overflow: hidden;
+  max-width: 16ch;
+  font-weight: 700;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.link:hover {
+  color: var(--accent-ink);
+}
+
+.signOut {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--mute);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.signOut:hover {
+  color: var(--ink);
+}

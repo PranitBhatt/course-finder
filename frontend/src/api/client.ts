@@ -1,4 +1,4 @@
-import type { CourseSearchResponse, ProblemDetail, SearchParams, SourceInfo } from './types';
+import type { AuthResponse, CourseSearchResponse, ProblemDetail, SearchParams, SourceInfo, User } from './types';
 
 export const PAGE_SIZE = 12;
 
@@ -31,10 +31,29 @@ export class ApiError extends Error {
   }
 }
 
-async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
+/**
+ * `token` is optional on purpose: only callers that really need to say who the user is
+ * (right now just fetchMe) pass it. Every other call goes out without an Authorization header.
+ */
+async function getJson<T>(path: string, signal?: AbortSignal, token?: string): Promise<T> {
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return sendRequest<T>(path, { signal, headers });
+}
+
+/** POST a JSON body. Used for login and register, which don't need a token (that's how you get one). */
+async function postJson<T>(path: string, body: unknown): Promise<T> {
+  return sendRequest<T>(path, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+async function sendRequest<T>(path: string, init: RequestInit): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(API_BASE + path, { signal, headers: { Accept: 'application/json' } });
+    response = await fetch(API_BASE + path, init);
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error;
     throw new ApiError(UNREACHABLE_MESSAGE, null);
@@ -76,4 +95,17 @@ export function searchCourses(params: SearchParams, signal?: AbortSignal): Promi
 
 export function fetchSources(signal?: AbortSignal): Promise<SourceInfo[]> {
   return getJson<SourceInfo[]>('/api/sources', signal);
+}
+
+export function login(email: string, password: string): Promise<AuthResponse> {
+  return postJson<AuthResponse>('/api/auth/login', { email, password });
+}
+
+export function register(email: string, password: string, displayName: string): Promise<AuthResponse> {
+  return postJson<AuthResponse>('/api/auth/register', { email, password, displayName });
+}
+
+/** The ONLY call that sends the token: /me has to know who is asking. */
+export function fetchMe(token: string, signal?: AbortSignal): Promise<User> {
+  return getJson<User>('/api/me', signal, token);
 }
